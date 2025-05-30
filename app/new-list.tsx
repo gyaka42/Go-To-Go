@@ -1,144 +1,200 @@
-import { useState, useRef } from "react";
+// app/new-list.tsx
+import React, { useState, useContext, useEffect } from "react";
 import {
   View,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  TouchableOpacity,
   Text,
+  TextInput,
+  Pressable,
+  TouchableOpacity,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import { useContext, useEffect } from "react";
-import TodoItem from "../components/TodoItem";
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { ListsContext } from "../context/ListsContext";
-import { SwipeListView } from "react-native-swipe-list-view";
 
 export default function NewListScreen() {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [tasks, setTasks] = useState([]);
-  const [newTask, setNewTask] = useState("");
-  const inputRef = useRef(null);
-
-  const { setLists } = useContext(ListsContext);
   const navigation = useNavigation();
+  const { setLists, setTasksMap } = useContext(ListsContext);
+
+  const [title, setTitle] = useState("");
+  const [newTask, setNewTask] = useState("");
+  const [tasks, setTasks] = useState<
+    { id: string; title: string; done: boolean }[]
+  >([]);
+
+  // Long-press edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+
+  // Save list & tasks before leaving
+  useEffect(() => {
+    return navigation.addListener("beforeRemove", () => {
+      const label = title.trim() || "Naamloze lijst";
+      const newKey = Date.now().toString();
+      setLists((prev) => [
+        ...prev,
+        {
+          key: newKey,
+          icon: "format-list-bulleted",
+          label,
+          count: tasks.length,
+        },
+      ]);
+      setTasksMap((prev) => ({ ...prev, [newKey]: tasks }));
+    });
+  }, [navigation, setLists, setTasksMap, title, tasks]);
 
   const addTask = () => {
     if (!newTask.trim()) return;
     setTasks((prev) => [
       ...prev,
-      { id: Date.now().toString(), title: newTask, done: false },
+      { id: Date.now().toString(), title: newTask.trim(), done: false },
     ]);
     setNewTask("");
   };
 
-  // Toggle task completion
-  const toggleTask = (id) => {
+  const toggleTask = (id: string) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
     );
   };
 
-  // Delete a task
-  const deleteTask = (id) => {
+  const deleteTask = (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener("beforeRemove", () => {
-      if (title.trim()) {
-        setLists((prev) => [
-          ...prev,
-          {
-            key: Date.now().toString(),
-            icon: "format-list-bulleted",
-            label: title,
-            count: null,
-          },
-        ]);
-      }
-    });
-    return unsubscribe;
-  }, [navigation, title, setLists]);
+  const commitEdit = (id: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, title: editingText } : t))
+    );
+    setEditingId(null);
+  };
+
+  const renderTask = ({
+    item,
+  }: {
+    item: { id: string; title: string; done: boolean };
+  }) => (
+    <View style={styles.rowFront}>
+      <Pressable
+        onPress={() => toggleTask(item.id)}
+        onLongPress={() => {
+          setEditingId(item.id);
+          setEditingText(item.title);
+        }}
+        delayLongPress={300}
+        style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+      >
+        {editingId === item.id ? (
+          <TextInput
+            value={editingText}
+            onChangeText={setEditingText}
+            onSubmitEditing={() => commitEdit(item.id)}
+            onBlur={() => setEditingId(null)}
+            style={[styles.rowText, { flex: 1, marginLeft: 8, padding: 0 }]}
+            autoFocus
+          />
+        ) : (
+          <>
+            <MaterialCommunityIcons
+              name={
+                item.done
+                  ? "checkbox-marked-circle"
+                  : "checkbox-blank-circle-outline"
+              }
+              size={24}
+              color={item.done ? "#10B981" : "#6B7280"}
+            />
+            <Text
+              style={[
+                styles.rowText,
+                item.done && styles.rowDone,
+                { marginLeft: 8 },
+              ]}
+            >
+              {item.title}
+            </Text>
+          </>
+        )}
+      </Pressable>
+
+      {/* delete-knop blijft buiten de Pressable */}
+      <TouchableOpacity
+        onPress={() => deleteTask(item.id)}
+        style={{ padding: 16 }}
+      >
+        <Text style={styles.deleteX}>✕</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
-    <SafeAreaView
-      edges={["left", "right", "top"]}
-      className="flex-1 bg-neutral-200"
-    >
-      {/* Header TextInput for list name */}
-      <View className="px-4 py-2">
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
         <TextInput
-          ref={inputRef}
           value={title}
           onChangeText={setTitle}
           placeholder="Naamloze lijst"
-          placeholderTextColor="#000000"
-          className="text-black text-3xl font-bold"
+          placeholderTextColor="#444"
+          style={[styles.titleInput, { marginLeft: 16 }]}
         />
       </View>
 
-      {/* Task list (with swipe-to-delete) */}
-      <View style={{ flex: 1 }}>
-        <SwipeListView
-          data={tasks}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <TodoItem
-              title={item.title}
-              done={item.done}
-              onToggle={() => toggleTask(item.id)}
-              onDelete={() => deleteTask(item.id)}
-            />
-          )}
-          renderHiddenItem={({ item }) => (
-            <View
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                backgroundColor: "#ef4444",
-              }}
-            >
-              <TouchableOpacity
-                style={{ padding: 16 }}
-                onPress={() => deleteTask(item.id)}
-              >
-                <MaterialIcons name="delete" size={24} color="white" />
-              </TouchableOpacity>
-            </View>
-          )}
-          disableRightSwipe={true}
-          rightOpenValue={-75}
-          previewRowKey={tasks.length ? tasks[0].id : null}
-          previewOpenValue={-40}
-          previewOpenDelay={3000}
-          contentContainerStyle={{ flexGrow: 1 }}
-          style={{ flex: 1 }}
+      <View style={styles.inputRow}>
+        <TextInput
+          value={newTask}
+          onChangeText={setNewTask}
+          placeholder="Nieuwe taak"
+          placeholderTextColor="#666"
+          style={styles.input}
         />
+        <TouchableOpacity onPress={addTask} style={styles.addBtn}>
+          <Ionicons name="add-circle-outline" size={28} color="#2563EB" />
+        </TouchableOpacity>
       </View>
-      {/* Add task bar at bottom */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
-        <SafeAreaView
-          edges={["bottom"]}
-          className=" bg-rose-300 rounded-s px-8 pb-2 items-center"
-        >
-          <TouchableOpacity
-            onPress={addTask}
-            className="mt-6 flex-row items-center px-24 py-3 bg-gray-200 rounded-lg"
-          >
-            <Ionicons name="add-circle-outline" size={24} color="#2563EB" />
-            <Text className="ml-2 text-blue-600 font-semibold">
-              Taak toevoegen
-            </Text>
-          </TouchableOpacity>
-        </SafeAreaView>
-      </KeyboardAvoidingView>
+
+      <FlatList
+        data={tasks}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={{ flexGrow: 1 }}
+        renderItem={renderTask}
+      />
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#F3F4F6" },
+  header: { padding: 16, backgroundColor: "#F3F4F6" },
+  titleInput: { fontSize: 24, fontWeight: "700", color: "#111" },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    backgroundColor: "#FFF",
+  },
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 8,
+  },
+  addBtn: { marginLeft: 8 },
+  rowFront: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    padding: 12,
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  rowText: { color: "#111" },
+  rowDone: { textDecorationLine: "line-through", color: "#9CA3AF" },
+  deleteX: { color: "#EF4444", fontWeight: "700", marginLeft: 8 },
+});

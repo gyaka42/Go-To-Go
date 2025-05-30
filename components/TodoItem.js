@@ -10,7 +10,8 @@ export default function TodoItem({ title, done, onToggle, onDelete }) {
           {title}
         </Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={onDelete} hitSlop={8}>
+      {/* Altijd zichtbaar: delete-knop */}
+      <TouchableOpacity onPress={onDelete} hitSlop={8} className="p-2">
         <Text className="text-red-500 font-bold">✕</Text>
       </TouchableOpacity>
     </View>
