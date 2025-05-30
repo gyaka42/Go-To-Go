@@ -1,5 +1,6 @@
 // app/new-list.tsx
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useContext, useEffect, useLayoutEffect } from "react";
+import ShareModal from "./new-list/share";
 import {
   View,
   Text,
@@ -9,6 +10,9 @@ import {
   FlatList,
   SafeAreaView,
   StyleSheet,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -25,6 +29,22 @@ export default function NewListScreen() {
   const [tasks, setTasks] = useState<
     { id: string; title: string; done: boolean }[]
   >([]);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showShare, setShowShare] = useState(false);
+
+  // Add the options button into the native header
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setShowOptions(true)}
+          style={{ marginRight: 16 }}
+        >
+          <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   // Long-press edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -163,14 +183,107 @@ export default function NewListScreen() {
         contentContainerStyle={{ flexGrow: 1 }}
         renderItem={renderTask}
       />
+      <Modal
+        visible={showOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowOptions(false)}
+      >
+        <View style={styles.modal}>
+          {/* backdrop + sheet container */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowOptions(false)}
+          />
+          <View style={styles.sheet}>
+            <View>
+              <Text style={styles.modalTitle}>Opties</Text>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => {
+                  setTasks((t) =>
+                    [...t].sort((a, b) => a.title.localeCompare(b.title))
+                  );
+                  setShowOptions(false);
+                }}
+              >
+                <Ionicons name="swap-vertical" size={24} color="#333" />
+                <Text style={styles.rowText}>Sorteer alfabetisch</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => {
+                  setTasks((t) =>
+                    [...t].sort((a, b) => Number(a.id) - Number(b.id))
+                  );
+                  setShowOptions(false);
+                }}
+              >
+                <Ionicons name="calendar" size={24} color="#333" />
+                <Text style={styles.rowText}>Sorteer op datum</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => {
+                  setShowOptions(false);
+                  setShowShare(true);
+                }}
+              >
+                <Ionicons name="copy-outline" size={24} color="#333" />
+                <Text style={styles.rowText}>Kopie verzenden</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => {
+                  // TODO: print logic
+                  setShowOptions(false);
+                }}
+              >
+                <Ionicons name="print-outline" size={24} color="#333" />
+                <Text style={styles.rowText}>Lijst afdrukken</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal
+        visible={showShare}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowShare(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          style={styles.modal}
+        >
+          {/* backdrop + sheet container */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowShare(false)}
+          />
+          <View style={styles.sheet}>
+            <ShareModal
+              listTitle={title.trim() || "Naamloze lijst"}
+              tasks={tasks}
+              onClose={() => setShowShare(false)}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F3F4F6" },
-  header: { padding: 16, backgroundColor: "#F3F4F6" },
-  titleInput: { fontSize: 24, fontWeight: "700", color: "#111" },
+  header: { padding: 16, backgroundColor: "#FFF" },
+  titleInput: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#111",
+    backgroundColor: "#FFF",
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -194,7 +307,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#E5E7EB",
   },
-  rowText: { color: "#111" },
+  rowText: { marginLeft: 12, fontSize: 16, color: "#333" },
   rowDone: { textDecorationLine: "line-through", color: "#9CA3AF" },
   deleteX: { color: "#EF4444", fontWeight: "700", marginLeft: 8 },
+  modal: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  sheet: {
+    backgroundColor: "#FFF",
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    paddingTop: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    maxHeight: "50%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
 });

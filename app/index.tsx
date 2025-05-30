@@ -71,7 +71,7 @@ export default function HomeScreen() {
       <Header
         username="Gökhan Yaka"
         avatarSource={require("../assets/avatar.png")}
-        onSearch={() => console.log("Search pressed")}
+        onSearch={() => router.push("/search")}
       />
 
       <FlatList
