@@ -1,19 +1,27 @@
-import { FlatList, View, Text } from "react-native";
-import { TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
+// app/index.tsx
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import {
+  FlatList,
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import BottomBar from "../components/BottomBar";
 import MenuItem from "../components/MenuItem";
 import Header from "../components/Header";
 import { useFocusEffect } from "@react-navigation/native";
-import { useContext, useState, useCallback } from "react";
 import { ListsContext, ListItem } from "../context/ListsContext";
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const baseMenu: ListItem[] = [
   { key: "mijnDag", icon: "weather-sunny", label: "Mijn dag", count: null },
-  { key: "belangrijk", icon: "star-outline", label: "Belangrijk", count: 66 },
+  { key: "belangrijk", icon: "star-outline", label: "Belangrijk", count: null },
   {
     key: "gepland",
     icon: "calendar-blank-outline",
@@ -25,16 +33,61 @@ const baseMenu: ListItem[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
-
-  const handlePress = (item) => {
-    // navigeer naar detail of screen
-    router.push(`/task/${item.key}`);
-  };
-
   const { lists, setLists, tasksMap } = useContext(ListsContext);
 
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
+  // Bij opstarten: laad eventueel eerder opgeslagen avatar‐URI uit AsyncStorage
+  useEffect(() => {
+    AsyncStorage.getItem("user_avatar").then((uri) => {
+      if (uri) {
+        setAvatarUri(uri);
+      }
+    });
+  }, []);
+
+  // Vraag permissie voor foto‐bibliotheek
+  useEffect(() => {
+    (async () => {
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        alert(
+          "Toestemming voor foto's is nodig om de avatar te kunnen wijzigen."
+        );
+      }
+    })();
+  }, []);
+
+  // Functie: open galerij, laat gebruiker een foto kiezen, en sla URI op
+  const pickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        // Gebruik hier “MediaTypeOptions” om met v16.1.4-typings te blijven werken:
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      // De nieuwe API gebruikt 'canceled' i.p.v. 'cancelled',
+      // en plaatst gekozen media in result.assets[0].uri
+      if (!result.canceled && result.assets.length > 0) {
+        const chosenUri = result.assets[0].uri;
+        setAvatarUri(chosenUri);
+
+        // Sla URI permanent op in AsyncStorage
+        AsyncStorage.setItem("user_avatar", chosenUri).catch(() => {
+          console.warn("Kon avatar-URI niet opslaan in AsyncStorage");
+        });
+      }
+    } catch (err) {
+      console.error("Fout bij openen galerij:", err);
+    }
+  };
+
+  // Bereken badge‐counts (aantal taken per lijst) elke keer dat "lists" verandert
   useFocusEffect(
     useCallback(() => {
       const allKeys = [
@@ -45,7 +98,7 @@ export default function HomeScreen() {
         allKeys.map(async (k) => {
           const json = await AsyncStorage.getItem(`todos_${k}`);
           const arr = json ? JSON.parse(json) : [];
-          return [k, arr.length];
+          return [k, arr.length] as [string, number];
         })
       ).then((entries) => setCounts(Object.fromEntries(entries)));
     }, [lists])
@@ -55,35 +108,43 @@ export default function HomeScreen() {
     setLists((prev) => prev.filter((l) => l.key !== key));
   };
 
+  // Combineer standaard‐ en eigen lijsten, met de “count” uit tasksMap of AsyncStorage
   const combined = [...baseMenu, ...lists].map((item) => {
     const customTasks = tasksMap[item.key];
     return {
       ...item,
       count:
         customTasks !== undefined
-          ? customTasks.length // direct uit context voor custom lijsten
-          : counts[item.key] ?? null, // fallback naar AsyncStorage voor built‐ins
+          ? customTasks.length
+          : counts[item.key] ?? null,
     };
   });
 
   return (
-    <SafeAreaView edges={["left", "right"]} className="flex-1 bg-gray-50">
+    <SafeAreaView
+      // Zet hier expliciet alle veilige randen aan, inclusief 'top'
+      edges={["left", "right"]}
+      style={styles.container}
+    >
+      {/* Header met klikbare avatar */}
       <Header
         username="Gökhan Yaka"
-        avatarSource={require("../assets/avatar.png")}
+        avatarSource={
+          avatarUri ? { uri: avatarUri } : require("../assets/avatar.png")
+        }
         onSearch={() => router.push("/search")}
+        onAvatarPress={pickAvatar}
       />
 
+      {/* Overzicht van alle lijsten */}
       <FlatList
         data={combined}
         keyExtractor={(item) => item.key}
         renderItem={({ item }) => {
-          // Only allow delete for user-created lists (not baseMenu)
-          const isCustom = lists.find((l) => l.key === item.key) != null;
+          const isCustom = lists.some((l) => l.key === item.key);
           return (
-            <View className="flex-row items-center px-4 py-2 border-b border-gray-200">
-              {/* Icon + label only */}
-              <View className="flex-1">
+            <View style={styles.listRow}>
+              <View style={{ flex: 1 }}>
                 <MenuItem
                   iconName={item.icon}
                   label={item.label}
@@ -91,21 +152,17 @@ export default function HomeScreen() {
                   count={undefined}
                 />
               </View>
-              {/* Delete icon for custom lists */}
               {isCustom && (
                 <TouchableOpacity
                   onPress={() => deleteList(item.key)}
-                  className="p-2 ml-2"
+                  style={styles.deleteIcon}
                 >
                   <MaterialIcons name="delete" size={20} color="#EF4444" />
                 </TouchableOpacity>
               )}
-              {/* Manual badge, swapped to right of delete icon */}
               {item.count != null && (
-                <View className="bg-blue-500 rounded-full px-2 py-0.5 ml-2">
-                  <Text className="text-xs font-semibold text-white">
-                    {item.count}
-                  </Text>
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{item.count}</Text>
                 </View>
               )}
             </View>
@@ -117,3 +174,24 @@ export default function HomeScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#FFF" },
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  deleteIcon: { padding: 8, marginLeft: 8 },
+  badge: {
+    backgroundColor: "#3B82F6",
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginLeft: 8,
+  },
+  badgeText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
+});
