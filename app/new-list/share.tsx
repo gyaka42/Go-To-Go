@@ -1,4 +1,3 @@
-// app/new-list/share.tsx
 import React, { FC, useState } from "react";
 import {
   View,

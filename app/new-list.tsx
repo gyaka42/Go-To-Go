@@ -5,7 +5,6 @@ import {
   View,
   Text,
   TextInput,
-  Pressable,
   TouchableOpacity,
   FlatList,
   SafeAreaView,
@@ -18,6 +17,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { ListsContext } from "../context/ListsContext";
+import * as Print from "expo-print";
 
 export default function NewListScreen() {
   const router = useRouter();
@@ -32,7 +32,7 @@ export default function NewListScreen() {
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
-  // Add the options button into the native header
+  // Voeg de opties-knop toe aan de header
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -46,11 +46,11 @@ export default function NewListScreen() {
     });
   }, [navigation]);
 
-  // Long-press edit state
+  // Long-press edit state voor taken
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
 
-  // Save list & tasks before leaving
+  // Sla lijst & taken op bij verlaten
   useEffect(() => {
     return navigation.addListener("beforeRemove", () => {
       const label = title.trim() || "Naamloze lijst";
@@ -100,7 +100,7 @@ export default function NewListScreen() {
     item: { id: string; title: string; done: boolean };
   }) => (
     <View style={styles.rowFront}>
-      <Pressable
+      <TouchableOpacity
         onPress={() => toggleTask(item.id)}
         onLongPress={() => {
           setEditingId(item.id);
@@ -140,9 +140,9 @@ export default function NewListScreen() {
             </Text>
           </>
         )}
-      </Pressable>
+      </TouchableOpacity>
 
-      {/* delete-knop blijft buiten de Pressable */}
+      {/* delete-knop blijft buiten de TouchableOpacity */}
       <TouchableOpacity
         onPress={() => deleteTask(item.id)}
         style={{ padding: 16 }}
@@ -151,6 +151,33 @@ export default function NewListScreen() {
       </TouchableOpacity>
     </View>
   );
+
+  /** Functie om de lijst (met titel & taken) als HTML naar de print-API te sturen */
+  const handlePrint = async () => {
+    // Bouw een eenvoudige HTML-representatie
+    const label = title.trim() || "Naamloze lijst";
+    const htmlLines = [
+      `<h1 style="font-family: sans-serif;">${label}</h1>`,
+      `<p style="font-family: sans-serif;">Taken:</p>`,
+      `<ul style="font-family: sans-serif;">`,
+      ...tasks.map(
+        (t) => `<li>${t.title} ${t.done ? " (✓ voltooid)" : " (✗ open)"}</li>`
+      ),
+      `</ul>`,
+    ];
+    const html = htmlLines.join("\n");
+
+    try {
+      await Print.printAsync({ html });
+    } catch (err: any) {
+      // Foutmeldingen bij annuleren negeren, log andere fouten
+      const message = err?.message ?? "";
+      if (message.includes("Printing did not complete")) {
+        return;
+      }
+      console.error("Print-fout:", err);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -183,6 +210,8 @@ export default function NewListScreen() {
         contentContainerStyle={{ flexGrow: 1 }}
         renderItem={renderTask}
       />
+
+      {/* Options Bottom Sheet */}
       <Modal
         visible={showOptions}
         transparent
@@ -190,62 +219,70 @@ export default function NewListScreen() {
         onRequestClose={() => setShowOptions(false)}
       >
         <View style={styles.modal}>
-          {/* backdrop + sheet container */}
+          {/* backdrop om te sluiten */}
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             onPress={() => setShowOptions(false)}
           />
           <View style={styles.sheet}>
-            <View>
-              <Text style={styles.modalTitle}>Opties</Text>
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => {
-                  setTasks((t) =>
-                    [...t].sort((a, b) => a.title.localeCompare(b.title))
-                  );
-                  setShowOptions(false);
-                }}
-              >
-                <Ionicons name="swap-vertical" size={24} color="#333" />
-                <Text style={styles.rowText}>Sorteer alfabetisch</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => {
-                  setTasks((t) =>
-                    [...t].sort((a, b) => Number(a.id) - Number(b.id))
-                  );
-                  setShowOptions(false);
-                }}
-              >
-                <Ionicons name="calendar" size={24} color="#333" />
-                <Text style={styles.rowText}>Sorteer op datum</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => {
-                  setShowOptions(false);
-                  setShowShare(true);
-                }}
-              >
-                <Ionicons name="copy-outline" size={24} color="#333" />
-                <Text style={styles.rowText}>Kopie verzenden</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.row}
-                onPress={() => {
-                  // TODO: print logic
-                  setShowOptions(false);
-                }}
-              >
-                <Ionicons name="print-outline" size={24} color="#333" />
-                <Text style={styles.rowText}>Lijst afdrukken</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.modalTitle}>Opties</Text>
+
+            {/* Sorteren alfabetisch */}
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => {
+                setTasks((t) =>
+                  [...t].sort((a, b) => a.title.localeCompare(b.title))
+                );
+                setShowOptions(false);
+              }}
+            >
+              <Ionicons name="swap-vertical" size={24} color="#333" />
+              <Text style={styles.rowText}>Sorteer alfabetisch</Text>
+            </TouchableOpacity>
+
+            {/* Sorteren op datum (ID-volgorde) */}
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => {
+                setTasks((t) =>
+                  [...t].sort((a, b) => Number(a.id) - Number(b.id))
+                );
+                setShowOptions(false);
+              }}
+            >
+              <Ionicons name="calendar" size={24} color="#333" />
+              <Text style={styles.rowText}>Sorteer op datum</Text>
+            </TouchableOpacity>
+
+            {/* Kopie verzenden (ShareModal) */}
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => {
+                setShowOptions(false);
+                setShowShare(true);
+              }}
+            >
+              <Ionicons name="share-social-outline" size={24} color="#333" />
+              <Text style={styles.rowText}>Kopie verzenden</Text>
+            </TouchableOpacity>
+
+            {/* Lijst afdrukken (expo-print) */}
+            <TouchableOpacity
+              style={styles.row}
+              onPress={async () => {
+                setShowOptions(false);
+                await handlePrint();
+              }}
+            >
+              <Ionicons name="print-outline" size={24} color="#333" />
+              <Text style={styles.rowText}>Lijst afdrukken</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Share Bottom Sheet */}
       <Modal
         visible={showShare}
         transparent
@@ -257,7 +294,7 @@ export default function NewListScreen() {
           keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
           style={styles.modal}
         >
-          {/* backdrop + sheet container */}
+          {/* backdrop */}
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             onPress={() => setShowShare(false)}

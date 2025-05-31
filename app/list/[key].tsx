@@ -19,8 +19,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ListsContext } from "../../context/ListsContext";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
-import OptionsModal from "../new-list/options";
 import ShareModal from "../new-list/share";
+import OptionsModal from "../new-list/options";
+import * as Print from "expo-print"; // <-- import expo-print
 
 export default function ListDetail() {
   const { key } = useLocalSearchParams();
@@ -31,14 +32,7 @@ export default function ListDetail() {
 
   const isCustom = lists.some((l) => l.key === listKey);
 
-  // Load tasks for custom lists if not present
-  useEffect(() => {
-    if (isCustom && !(listKey in tasksMap)) {
-      setTasksMap((prev) => ({ ...prev, [listKey]: [] }));
-    }
-  }, [isCustom, listKey, tasksMap, setTasksMap]);
-
-  // Metadata
+  // Basislijsten + custom lijsten metadata
   const baseMenu = [
     { key: "mijnDag", icon: "weather-sunny", label: "Mijn dag", count: null },
     {
@@ -59,36 +53,17 @@ export default function ListDetail() {
     baseMenu.find((l) => l.key === listKey) || { label: "Onbekende lijst" };
   const listLabel = listMeta.label;
 
-  // State
+  // State voor nieuwe taak, takenlijst, opties & delen
   const [newTask, setNewTask] = useState("");
   const [tasks, setTasks] = useState(tasksMap[listKey] || []);
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
+
+  // State voor long-press bewerken
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
 
-  // Header buttons
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: listLabel,
-      headerBackTitle: "Go-To-Go",
-      headerRight: () => (
-        <RNView style={{ flexDirection: "row", marginRight: 16 }}>
-          <TouchableOpacity
-            onPress={() => setShowShare(true)}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="share-social-outline" size={24} color="#000" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setShowOptions(true)}>
-            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
-          </TouchableOpacity>
-        </RNView>
-      ),
-    });
-  }, [navigation, listLabel]);
-
-  // Sync tasksMap for custom lists; for standard, load/save AsyncStorage
+  // Haal taken in (of leeg maken) afhankelijk van custom vs standaard
   useEffect(() => {
     if (!isCustom) {
       AsyncStorage.getItem(`todos_${listKey}`)
@@ -99,6 +74,7 @@ export default function ListDetail() {
     }
   }, [listKey, isCustom, tasksMap]);
 
+  // Bewaar taken & update badge count
   useEffect(() => {
     if (isCustom) {
       setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
@@ -107,11 +83,33 @@ export default function ListDetail() {
         () => {}
       );
     }
-    // update badge count
     setLists((prev) =>
       prev.map((l) => (l.key === listKey ? { ...l, count: tasks.length } : l))
     );
   }, [tasks]);
+
+  // Stel header in (titel, back-button, opties-knop, deel-knop)
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: listLabel,
+      headerBackTitle: "Go-To-Go",
+      headerRight: () => (
+        <RNView style={{ flexDirection: "row", marginRight: 16 }}>
+          {/* Deel-knop */}
+          <TouchableOpacity
+            onPress={() => setShowShare(true)}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="share-social-outline" size={24} color="#000" />
+          </TouchableOpacity>
+          {/* Opties-knop */}
+          <TouchableOpacity onPress={() => setShowOptions(true)}>
+            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        </RNView>
+      ),
+    });
+  }, [navigation, listLabel]);
 
   const addTask = () => {
     if (!newTask.trim()) return;
@@ -191,11 +189,40 @@ export default function ListDetail() {
     </View>
   );
 
+  /** Print-functie voor deze lijst (fout “Printing did not complete” negeren) */
+  const handlePrint = async () => {
+    const htmlLines = [
+      `<h1 style="font-family: sans-serif;">${listLabel}</h1>`,
+      `<p style="font-family: sans-serif;">Taken:</p>`,
+      `<ul style="font-family: sans-serif;">`,
+      ...tasks.map(
+        (t) => `<li>${t.title} ${t.done ? "(✓ voltooid)" : "(✗ open)"}</li>`
+      ),
+      `</ul>`,
+    ];
+    const html = htmlLines.join("\n");
+
+    try {
+      await Print.printAsync({ html });
+    } catch (err: any) {
+      // Bij annuleren gooit printAsync vaak "Printing did not complete"
+      const msg = err?.message ?? "";
+      if (msg.includes("Printing did not complete")) {
+        // Gebruiker annuleerde de printdialoog: negeren
+        return;
+      }
+      console.error("Print-fout:", err);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
+      {/* Koptekst (lijstnaam) */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{listLabel}</Text>
       </View>
+
+      {/* Invoerveld nieuwe taak */}
       <View style={styles.inputRow}>
         <TextInput
           value={newTask}
@@ -207,6 +234,8 @@ export default function ListDetail() {
           <Ionicons name="add-circle-outline" size={28} color="#2563EB" />
         </TouchableOpacity>
       </View>
+
+      {/* Takenlijst */}
       <FlatList
         data={tasks}
         keyExtractor={(t) => t.id}
@@ -214,7 +243,7 @@ export default function ListDetail() {
         contentContainerStyle={{ flexGrow: 1 }}
       />
 
-      {/* Options bottom sheet */}
+      {/* Options Bottom Sheet */}
       <Modal
         visible={showOptions}
         transparent
@@ -222,12 +251,15 @@ export default function ListDetail() {
         onRequestClose={() => setShowOptions(false)}
       >
         <View style={styles.modal}>
+          {/* backdrop */}
           <TouchableOpacity
             style={RNStyleSheet.absoluteFill}
             onPress={() => setShowOptions(false)}
           />
           <View style={styles.sheet}>
             <Text style={styles.modalTitle}>Opties</Text>
+
+            {/* Sorteren alfabetisch */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -240,6 +272,8 @@ export default function ListDetail() {
               <Ionicons name="swap-vertical" size={24} color="#333" />
               <Text style={styles.rowText}>Sorteer alfabetisch</Text>
             </TouchableOpacity>
+
+            {/* Sorteren op datum */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -252,6 +286,8 @@ export default function ListDetail() {
               <Ionicons name="calendar" size={24} color="#333" />
               <Text style={styles.rowText}>Sorteer op datum</Text>
             </TouchableOpacity>
+
+            {/* Kopie verzenden */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -262,9 +298,14 @@ export default function ListDetail() {
               <Ionicons name="share-social-outline" size={24} color="#333" />
               <Text style={styles.rowText}>Kopie verzenden</Text>
             </TouchableOpacity>
+
+            {/* Lijst afdrukken */}
             <TouchableOpacity
               style={styles.row}
-              onPress={() => setShowOptions(false)}
+              onPress={async () => {
+                setShowOptions(false);
+                await handlePrint();
+              }}
             >
               <Ionicons name="print-outline" size={24} color="#333" />
               <Text style={styles.rowText}>Lijst afdrukken</Text>
@@ -273,7 +314,7 @@ export default function ListDetail() {
         </View>
       </Modal>
 
-      {/* Share bottom sheet */}
+      {/* Share Bottom Sheet */}
       <Modal
         visible={showShare}
         transparent
@@ -333,7 +374,7 @@ const styles = RNStyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#E5E7EB",
   },
-  //rowText: { marginLeft: 8, color: "#111" },
+  rowText: { marginLeft: 12, fontSize: 16, color: "#333" },
   rowDone: { textDecorationLine: "line-through", color: "#9CA3AF" },
   deleteX: { color: "#EF4444", fontWeight: "700" },
   modal: {
@@ -350,5 +391,4 @@ const styles = RNStyleSheet.create({
   },
   modalTitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
   row: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
-  rowText: { marginLeft: 12, fontSize: 16, color: "#333" },
 });

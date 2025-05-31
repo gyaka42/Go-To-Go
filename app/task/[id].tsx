@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { View, Text, Button } from "react-native";
-import { loadTodos, saveTodos } from "../../utils/storage";
+import { loadTodos } from "../../utils/storage";
 import { useEffect, useState } from "react";
 
 export default function TaskDetail() {

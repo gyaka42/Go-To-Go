@@ -3,7 +3,6 @@ import React, { FC } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
-// Props interface voor OptionsModal
 interface Props {
   onClose: () => void;
   onSortAlphabetical: () => void;
