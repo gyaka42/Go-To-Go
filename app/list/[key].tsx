@@ -78,7 +78,7 @@ export default function ListDetail() {
             onPress={() => setShowShare(true)}
             style={{ marginRight: 16 }}
           >
-            <Ionicons name="copy-outline" size={24} color="#000" />
+            <Ionicons name="share-social-outline" size={24} color="#000" />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowOptions(true)}>
             <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
@@ -259,7 +259,7 @@ export default function ListDetail() {
                 setShowShare(true);
               }}
             >
-              <Ionicons name="copy-outline" size={24} color="#333" />
+              <Ionicons name="share-social-outline" size={24} color="#333" />
               <Text style={styles.rowText}>Kopie verzenden</Text>
             </TouchableOpacity>
             <TouchableOpacity
