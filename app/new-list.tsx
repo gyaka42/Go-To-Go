@@ -114,7 +114,7 @@ export default function NewListScreen() {
             value={editingText}
             onChangeText={setEditingText}
             onSubmitEditing={() => commitEdit(item.id)}
-            onBlur={() => setEditingId(null)}
+            onBlur={() => commitEdit(item.id)}
             style={[styles.rowText, { flex: 1, marginLeft: 8, padding: 0 }]}
             autoFocus
           />
