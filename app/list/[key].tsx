@@ -32,7 +32,11 @@ export default function ListDetail() {
 
   const isCustom = lists.some((l) => l.key === listKey);
 
-  // Basislijsten + custom lijsten metadata
+  // Staat voor in- of uitgeschakelde “naam wijzigen”-modus
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameText, setRenameText] = useState("");
+
+  // Metadata: standaardlijsten en eventueel aangepaste lijsten
   const baseMenu = [
     { key: "mijnDag", icon: "weather-sunny", label: "Mijn dag", count: null },
     {
@@ -51,19 +55,29 @@ export default function ListDetail() {
   ];
   const listMeta = lists.find((l) => l.key === listKey) ||
     baseMenu.find((l) => l.key === listKey) || { label: "Onbekende lijst" };
-  const listLabel = listMeta.label;
+  // Huidige label (en initialiseren met wat in context staat)
+  const [currentLabel, setCurrentLabel] = useState(listMeta.label);
 
-  // State voor nieuwe taak, takenlijst, opties & delen
+  // Zodra listMeta.label vanuit context wijzigt, updaten we currentLabel
+  useEffect(() => {
+    setCurrentLabel(listMeta.label);
+  }, [listMeta.label]);
+
+  // Taken ophalen (of initialiseren) uit context / AsyncStorage
+  useEffect(() => {
+    if (isCustom && !(listKey in tasksMap)) {
+      setTasksMap((prev) => ({ ...prev, [listKey]: [] }));
+    }
+  }, [isCustom, listKey, tasksMap, setTasksMap]);
+
   const [newTask, setNewTask] = useState("");
   const [tasks, setTasks] = useState(tasksMap[listKey] || []);
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
-
-  // State voor long-press bewerken
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
 
-  // Haal taken in (of leeg maken) afhankelijk van custom vs standaard
+  // Synchroniseer taken: voor custom in context, anders uit AsyncStorage
   useEffect(() => {
     if (!isCustom) {
       AsyncStorage.getItem(`todos_${listKey}`)
@@ -74,42 +88,22 @@ export default function ListDetail() {
     }
   }, [listKey, isCustom, tasksMap]);
 
-  // Bewaar taken & update badge count
   useEffect(() => {
     if (isCustom) {
+      // Custom lijst: in context opslaan
       setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
     } else {
+      // Standaardlijst: zowel AsyncStorage als context bijwerken
       AsyncStorage.setItem(`todos_${listKey}`, JSON.stringify(tasks)).catch(
         () => {}
       );
+      setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
     }
+    // Update badgecount in de context
     setLists((prev) =>
       prev.map((l) => (l.key === listKey ? { ...l, count: tasks.length } : l))
     );
   }, [tasks]);
-
-  // Stel header in (titel, back-button, opties-knop, deel-knop)
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: listLabel,
-      headerBackTitle: "Go-To-Go",
-      headerRight: () => (
-        <RNView style={{ flexDirection: "row", marginRight: 16 }}>
-          {/* Deel-knop */}
-          <TouchableOpacity
-            onPress={() => setShowShare(true)}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="share-social-outline" size={24} color="#000" />
-          </TouchableOpacity>
-          {/* Opties-knop */}
-          <TouchableOpacity onPress={() => setShowOptions(true)}>
-            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
-          </TouchableOpacity>
-        </RNView>
-      ),
-    });
-  }, [navigation, listLabel]);
 
   const addTask = () => {
     if (!newTask.trim()) return;
@@ -135,6 +129,22 @@ export default function ListDetail() {
       prev.map((t) => (t.id === id ? { ...t, title: editingText } : t))
     );
     setEditingId(null);
+  };
+
+  // **Functie om naam van lijst daadwerkelijk op te slaan**
+  const commitRename = () => {
+    const trimmed = renameText.trim();
+    if (!trimmed) {
+      setIsRenaming(false);
+      return;
+    }
+    // Update de context‐lijst
+    setLists((prev) =>
+      prev.map((l) => (l.key === listKey ? { ...l, label: trimmed } : l))
+    );
+    // En update currentLabel zodat de header meeschuift
+    setCurrentLabel(trimmed);
+    setIsRenaming(false);
   };
 
   const renderTask = ({ item }) => (
@@ -192,7 +202,7 @@ export default function ListDetail() {
   /** Print-functie voor deze lijst (fout “Printing did not complete” negeren) */
   const handlePrint = async () => {
     const htmlLines = [
-      `<h1 style="font-family: sans-serif;">${listLabel}</h1>`,
+      `<h1 style="font-family: sans-serif;">${currentLabel}</h1>`,
       `<p style="font-family: sans-serif;">Taken:</p>`,
       `<ul style="font-family: sans-serif;">`,
       ...tasks.map(
@@ -208,21 +218,69 @@ export default function ListDetail() {
       // Bij annuleren gooit printAsync vaak "Printing did not complete"
       const msg = err?.message ?? "";
       if (msg.includes("Printing did not complete")) {
-        // Gebruiker annuleerde de printdialoog: negeren
+        // Gebruiker annuleerde de printdialoog: gewoon negeren
         return;
       }
       console.error("Print-fout:", err);
     }
   };
 
+  // Stel header in (titel, back-button, deel-knop, opties-knop)
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: currentLabel,
+      headerBackTitle: "Go-To-Go",
+      headerRight: () => (
+        <RNView style={{ flexDirection: "row", marginRight: 16 }}>
+          {/* Deel-knop */}
+          <TouchableOpacity
+            onPress={() => setShowShare(true)}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="share-social-outline" size={24} color="#000" />
+          </TouchableOpacity>
+          {/* Opties-knop */}
+          <TouchableOpacity onPress={() => setShowOptions(true)}>
+            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        </RNView>
+      ),
+    });
+  }, [navigation, currentLabel]);
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Koptekst (lijstnaam) */}
+      {/* Bovenste balk met lijstnaam of TextInput */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>{listLabel}</Text>
+        {isCustom ? (
+          isRenaming ? (
+            <TextInput
+              value={renameText}
+              onChangeText={setRenameText}
+              onSubmitEditing={commitRename}
+              onBlur={commitRename}
+              autoFocus
+              placeholder="Nieuwe lijstnaam"
+              style={styles.renameInput}
+            />
+          ) : (
+            <Pressable
+              onPress={() => {
+                // Bij tik zetten we rename‐modus aan
+                setRenameText(currentLabel);
+                setIsRenaming(true);
+              }}
+              style={{ flex: 1 }}
+            >
+              <Text style={styles.headerTitle}>{currentLabel}</Text>
+            </Pressable>
+          )
+        ) : (
+          <Text style={styles.headerTitle}>{currentLabel}</Text>
+        )}
       </View>
 
-      {/* Invoerveld nieuwe taak */}
+      {/* Invoerregel voor nieuwe taak */}
       <View style={styles.inputRow}>
         <TextInput
           value={newTask}
@@ -235,7 +293,6 @@ export default function ListDetail() {
         </TouchableOpacity>
       </View>
 
-      {/* Takenlijst */}
       <FlatList
         data={tasks}
         keyExtractor={(t) => t.id}
@@ -243,7 +300,7 @@ export default function ListDetail() {
         contentContainerStyle={{ flexGrow: 1 }}
       />
 
-      {/* Options Bottom Sheet */}
+      {/* Opties‐sheet */}
       <Modal
         visible={showOptions}
         transparent
@@ -251,7 +308,6 @@ export default function ListDetail() {
         onRequestClose={() => setShowOptions(false)}
       >
         <View style={styles.modal}>
-          {/* backdrop */}
           <TouchableOpacity
             style={RNStyleSheet.absoluteFill}
             onPress={() => setShowOptions(false)}
@@ -314,7 +370,7 @@ export default function ListDetail() {
         </View>
       </Modal>
 
-      {/* Share Bottom Sheet */}
+      {/* Share‐sheet */}
       <Modal
         visible={showShare}
         transparent
@@ -332,7 +388,7 @@ export default function ListDetail() {
           />
           <RNView style={styles.sheet}>
             <ShareModal
-              listTitle={listLabel}
+              listTitle={currentLabel}
               tasks={tasks}
               onClose={() => setShowShare(false)}
             />
@@ -352,6 +408,16 @@ const styles = RNStyleSheet.create({
     backgroundColor: "#FFF",
   },
   headerTitle: { fontSize: 20, fontWeight: "600" },
+  renameInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    fontSize: 18,
+    backgroundColor: "#FFF",
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",

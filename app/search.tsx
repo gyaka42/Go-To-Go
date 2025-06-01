@@ -89,7 +89,7 @@ export default function SearchScreen() {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.row}
-            onPress={() => router.push(`/list/${item.listKey}`)}
+            onPress={() => router.replace(`/list/${item.listKey}`)}
           >
             <Text style={styles.title}>{item.title}</Text>
             <Text style={styles.sub}>{item.listLabel}</Text>
