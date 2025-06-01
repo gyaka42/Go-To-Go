@@ -1,5 +1,9 @@
 // app/new-list.tsx
 import React, { useState, useContext, useEffect, useLayoutEffect } from "react";
+import * as Notifications from "expo-notifications";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import ShareModal from "./new-list/share";
 import {
   View,
@@ -12,6 +16,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -27,10 +32,12 @@ export default function NewListScreen() {
   const [title, setTitle] = useState("");
   const [newTask, setNewTask] = useState("");
   const [tasks, setTasks] = useState<
-    { id: string; title: string; done: boolean }[]
+    { id: string; title: string; done: boolean; dueDate: Date | null }[]
   >([]);
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Voeg de opties-knop toe aan de header
   useLayoutEffect(() => {
@@ -68,13 +75,43 @@ export default function NewListScreen() {
     });
   }, [navigation, setLists, setTasksMap, title, tasks]);
 
-  const addTask = () => {
+  async function scheduleReminder(title: string, date: Date) {
+    const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
+    if (seconds <= 0) return; // voorkom directe melding bij verleden datum
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Taakherinnering",
+          body: title,
+          sound: "default",
+        },
+        trigger: {
+          type: "timeInterval" as any, // ⛑️ forceer correct type
+          seconds: Math.floor((date.getTime() - Date.now()) / 1000),
+          repeats: false,
+        },
+      });
+    } catch (err) {
+      console.error("Kon herinnering niet plannen:", err);
+    }
+  }
+
+  const addTask = async () => {
     if (!newTask.trim()) return;
-    setTasks((prev) => [
-      ...prev,
-      { id: Date.now().toString(), title: newTask.trim(), done: false },
-    ]);
+    const task = {
+      id: Date.now().toString(),
+      title: newTask.trim(),
+      done: false,
+      dueDate: dueDate || null,
+    };
+    setTasks((prev) => [...prev, task]);
     setNewTask("");
+
+    if (dueDate) {
+      await scheduleReminder(task.title, dueDate);
+      setDueDate(null);
+    }
   };
 
   const toggleTask = (id: string) => {
@@ -97,7 +134,7 @@ export default function NewListScreen() {
   const renderTask = ({
     item,
   }: {
-    item: { id: string; title: string; done: boolean };
+    item: { id: string; title: string; done: boolean; dueDate: Date | null };
   }) => (
     <View style={styles.rowFront}>
       <TouchableOpacity
@@ -107,7 +144,7 @@ export default function NewListScreen() {
           setEditingText(item.title);
         }}
         delayLongPress={300}
-        style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+        style={{ flex: 1, flexDirection: "column" }}
       >
         {editingId === item.id ? (
           <TextInput
@@ -120,24 +157,41 @@ export default function NewListScreen() {
           />
         ) : (
           <>
-            <MaterialCommunityIcons
-              name={
-                item.done
-                  ? "checkbox-marked-circle"
-                  : "checkbox-blank-circle-outline"
-              }
-              size={24}
-              color={item.done ? "#10B981" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.rowText,
-                item.done && styles.rowDone,
-                { marginLeft: 8 },
-              ]}
-            >
-              {item.title}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <MaterialCommunityIcons
+                name={
+                  item.done
+                    ? "checkbox-marked-circle"
+                    : "checkbox-blank-circle-outline"
+                }
+                size={24}
+                color={item.done ? "#10B981" : "#6B7280"}
+              />
+              <Text
+                style={[
+                  styles.rowText,
+                  item.done && styles.rowDone,
+                  { marginLeft: 8 },
+                ]}
+              >
+                {item.title}
+              </Text>
+            </View>
+            {item.dueDate && (
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#6B7280",
+                  marginLeft: 32,
+                  marginTop: 2,
+                }}
+              >
+                {new Date(item.dueDate).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
+              </Text>
+            )}
           </>
         )}
       </TouchableOpacity>
@@ -192,17 +246,69 @@ export default function NewListScreen() {
       </View>
 
       <View style={styles.inputRow}>
+        <TouchableOpacity style={{ marginRight: 8 }}>
+          <Ionicons
+            name="calendar-outline"
+            size={24}
+            color="#2563EB"
+            onPress={() => {
+              Keyboard.dismiss();
+              if (Platform.OS === "android") {
+                // Two-step picker: first date, then time
+                DateTimePickerAndroid.open({
+                  value: dueDate || new Date(),
+                  mode: "date",
+                  onChange: (event, selectedDate) => {
+                    if (event.type === "set" && selectedDate) {
+                      // After picking date, open time picker
+                      DateTimePickerAndroid.open({
+                        value: selectedDate,
+                        mode: "time",
+                        is24Hour: true,
+                        onChange: (evt2, selectedTime) => {
+                          if (evt2.type === "set" && selectedTime) {
+                            const combined = new Date(selectedDate);
+                            combined.setHours(
+                              selectedTime.getHours(),
+                              selectedTime.getMinutes()
+                            );
+                            setDueDate(combined);
+                          }
+                        },
+                      });
+                    }
+                  },
+                });
+              } else {
+                setShowDatePicker((prev) => !prev);
+              }
+            }}
+          />
+        </TouchableOpacity>
         <TextInput
           value={newTask}
           onChangeText={setNewTask}
           placeholder="Nieuwe taak"
           placeholderTextColor="#666"
-          style={styles.input}
+          style={[styles.input, { flex: 1 }]}
         />
         <TouchableOpacity onPress={addTask} style={styles.addBtn}>
           <Ionicons name="add-circle-outline" size={28} color="#2563EB" />
         </TouchableOpacity>
       </View>
+      {Platform.OS === "ios" && showDatePicker && (
+        <View style={{ alignItems: "center", marginVertical: 8 }}>
+          <DateTimePicker
+            value={dueDate || new Date()}
+            mode="datetime"
+            display="inline"
+            onChange={(_, selectedDate) => {
+              if (selectedDate) setDueDate(selectedDate);
+            }}
+            style={{ width: "90%" }}
+          />
+        </View>
+      )}
 
       <FlatList
         data={tasks}

@@ -4,6 +4,7 @@ import { StyleSheet, TouchableOpacity, View } from "react-native";
 import "../global.css";
 import { ListsProvider } from "../context/ListsContext";
 import * as SplashScreen from "expo-splash-screen";
+import * as Notifications from "expo-notifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -13,6 +14,32 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
 });
+
+useEffect(() => {
+  const setupNotifications = async () => {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== "granted") {
+      const { status: newStatus } =
+        await Notifications.requestPermissionsAsync();
+      if (newStatus !== "granted") {
+        alert("Geen toestemming voor notificaties");
+      }
+    }
+
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  };
+
+  setupNotifications();
+  SplashScreen.hideAsync();
+}, []);
 
 export default function Layout() {
   useEffect(() => {

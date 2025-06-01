@@ -1,6 +1,6 @@
 // app/list/[key].tsx
+
 import React, { useState, useEffect, useContext, useLayoutEffect } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   View,
   Text,
@@ -12,19 +12,25 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
-  StyleSheet as RNStyleSheet,
-  View as RNView,
+  StyleSheet,
+  Keyboard,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ListsContext } from "../../context/ListsContext";
+import { ListsContext, Task } from "../../context/ListsContext";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import ShareModal from "../new-list/share";
 import OptionsModal from "../new-list/options";
-import * as Print from "expo-print"; // <-- import expo-print
+import * as Print from "expo-print";
+import * as Notifications from "expo-notifications";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ListDetail() {
-  const { key } = useLocalSearchParams();
+  // --- ROUTER & CONTEXT ---
+  const { key } = useLocalSearchParams(); // key uit URL
   const listKey = Array.isArray(key) ? key[0] : key;
   const router = useRouter();
   const navigation = useNavigation();
@@ -32,122 +38,178 @@ export default function ListDetail() {
 
   const isCustom = lists.some((l) => l.key === listKey);
 
-  // Staat voor in- of uitgeschakelde “naam wijzigen”-modus
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameText, setRenameText] = useState("");
-
-  // Metadata: standaardlijsten en eventueel aangepaste lijsten
-  const baseMenu = [
-    { key: "mijnDag", icon: "weather-sunny", label: "Mijn dag", count: null },
-    {
-      key: "belangrijk",
-      icon: "star-outline",
-      label: "Belangrijk",
-      count: null,
-    },
-    {
-      key: "gepland",
-      icon: "calendar-blank-outline",
-      label: "Gepland",
-      count: null,
-    },
-    { key: "taken", icon: "check-circle-outline", label: "Taken", count: null },
-  ];
-  const listMeta = lists.find((l) => l.key === listKey) ||
-    baseMenu.find((l) => l.key === listKey) || { label: "Onbekende lijst" };
-  // Huidige label (en initialiseren met wat in context staat)
-  const [currentLabel, setCurrentLabel] = useState(listMeta.label);
-
-  // Zodra listMeta.label vanuit context wijzigt, updaten we currentLabel
-  useEffect(() => {
-    setCurrentLabel(listMeta.label);
-  }, [listMeta.label]);
-
-  // Taken ophalen (of initialiseren) uit context / AsyncStorage
-  useEffect(() => {
-    if (isCustom && !(listKey in tasksMap)) {
-      setTasksMap((prev) => ({ ...prev, [listKey]: [] }));
-    }
-  }, [isCustom, listKey, tasksMap, setTasksMap]);
-
+  // --- STATE FOR TASKS & REMINDERS ---
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState("");
-  const [tasks, setTasks] = useState(tasksMap[listKey] || []);
-  const [showOptions, setShowOptions] = useState(false);
-  const [showShare, setShowShare] = useState(false);
+  const [dueDate, setDueDate] = useState<Date | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // --- STATE FOR EDITING & MODALS ---
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
+  const [showOptions, setShowOptions] = useState(false);
+  const [showShare, setShowShare] = useState(false);
 
-  // Synchroniseer taken: voor custom in context, anders uit AsyncStorage
-  useEffect(() => {
-    if (!isCustom) {
-      AsyncStorage.getItem(`todos_${listKey}`)
-        .then((json) => setTasks(json ? JSON.parse(json) : []))
-        .catch(() => setTasks([]));
-    } else {
-      setTasks(tasksMap[listKey] || []);
-    }
-  }, [listKey, isCustom, tasksMap]);
-
+  // --- LOAD TASKS ONCE (NO CIRCULAR UPDATES) ---
   useEffect(() => {
     if (isCustom) {
-      // Custom lijst: in context opslaan
+      // Custom lijst: laad uit context (tasksMap)
+      const saved = tasksMap[listKey] || [];
+      const parsed = saved.map((t) => ({
+        ...t,
+        dueDate: t.dueDate ? new Date(t.dueDate) : null,
+      }));
+      setTasks(parsed);
+    } else {
+      // Standaardlijst: laad uit AsyncStorage
+      AsyncStorage.getItem(`todos_${listKey}`)
+        .then((json) => {
+          const savedTasks: (Task & { dueDate: string | null })[] = json
+            ? JSON.parse(json)
+            : [];
+          const parsedList: Task[] = savedTasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            done: t.done,
+            dueDate: t.dueDate ? new Date(t.dueDate) : null,
+          }));
+          setTasks(parsedList);
+        })
+        .catch(() => setTasks([]));
+    }
+  }, [listKey, isCustom]);
+
+  // --- SYNC TASKS BACK TO CONTEXT / STORAGE WHEN CHANGED ---
+  useEffect(() => {
+    if (isCustom) {
       setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
     } else {
-      // Standaardlijst: zowel AsyncStorage als context bijwerken
       AsyncStorage.setItem(`todos_${listKey}`, JSON.stringify(tasks)).catch(
         () => {}
       );
       setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
     }
-    // Update badgecount in de context
+    // Update badge‐count in context‐lists
     setLists((prev) =>
       prev.map((l) => (l.key === listKey ? { ...l, count: tasks.length } : l))
     );
   }, [tasks]);
 
+  // --- SCHEDULE NOTIFICATION HELPER ---
+  async function scheduleReminder(title: string, date: Date) {
+    const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
+    if (seconds <= 0) return;
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: "Taakherinnering",
+          body: title,
+          sound: "default",
+        },
+        trigger: {
+          type: "timeInterval" as any,
+          seconds,
+          repeats: false,
+        },
+      });
+    } catch (err) {
+      console.error("Kon herinnering niet plannen:", err);
+    }
+  }
+
+  // --- ADD TASK (INCL. DUE DATE & NOTIFICATIES) ---
   const addTask = () => {
     if (!newTask.trim()) return;
-    setTasks((prev) => [
-      ...prev,
-      { id: Date.now().toString(), title: newTask.trim(), done: false },
-    ]);
+    const task: Task = {
+      id: Date.now().toString(),
+      title: newTask.trim(),
+      done: false,
+      dueDate: dueDate || null,
+    };
+    setTasks((prev) => [...prev, task]);
     setNewTask("");
+    if (dueDate) {
+      scheduleReminder(task.title, dueDate);
+      setDueDate(null);
+    }
   };
 
+  // --- TOGGLE DONE ---
   const toggleTask = (id: string) => {
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
     );
   };
 
+  // --- DELETE TASK ---
   const deleteTask = (id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // --- COMMIT TASK EDIT ---
   const commitEdit = (id: string) => {
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, title: editingText } : t))
+      prev.map((t) =>
+        t.id === id ? { ...t, title: editingText, dueDate: t.dueDate } : t
+      )
     );
     setEditingId(null);
   };
 
-  // **Functie om naam van lijst daadwerkelijk op te slaan**
-  const commitRename = () => {
-    const trimmed = renameText.trim();
-    if (!trimmed) {
-      setIsRenaming(false);
-      return;
+  // --- PRINT FUNCTION ---
+  const handlePrint = async () => {
+    const htmlLines = [
+      `<h1 style="font-family: sans-serif;">${
+        lists.find((l) => l.key === listKey)?.label || "Lijst"
+      }</h1>`,
+      `<p style="font-family: sans-serif;">Taken:</p>`,
+      `<ul style="font-family: sans-serif;">`,
+      ...tasks.map(
+        (t) =>
+          `<li>${t.title} ${t.done ? " (✓ voltooid)" : " (✗ open)"}${
+            t.dueDate
+              ? ` (${new Date(t.dueDate).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })})`
+              : ""
+          }</li>`
+      ),
+      `</ul>`,
+    ];
+    const html = htmlLines.join("\n");
+    try {
+      await Print.printAsync({ html });
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("Printing did not complete")) return;
+      console.error("Print-fout:", err);
     }
-    // Update de context‐lijst
-    setLists((prev) =>
-      prev.map((l) => (l.key === listKey ? { ...l, label: trimmed } : l))
-    );
-    // En update currentLabel zodat de header meeschuift
-    setCurrentLabel(trimmed);
-    setIsRenaming(false);
   };
 
-  const renderTask = ({ item }) => (
+  // --- SET UP HEADER (DEEL & OPTIES) ---
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      title: lists.find((l) => l.key === listKey)?.label || "Lijst",
+      headerBackTitle: "Go-To-Go",
+      headerRight: () => (
+        <View style={{ flexDirection: "row", marginRight: 16 }}>
+          <TouchableOpacity
+            onPress={() => setShowShare(true)}
+            style={{ marginRight: 16 }}
+          >
+            <Ionicons name="share-social-outline" size={24} color="#000" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowOptions(true)}>
+            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation, lists, listKey]);
+
+  // --- RENDEREN PER TASK ---
+  const renderTask = ({ item }: { item: Task }) => (
     <View style={styles.rowFront}>
       <Pressable
         onPress={() => toggleTask(item.id)}
@@ -156,7 +218,7 @@ export default function ListDetail() {
           setEditingText(item.title);
         }}
         delayLongPress={300}
-        style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+        style={{ flex: 1, flexDirection: "column" }}
       >
         {editingId === item.id ? (
           <TextInput
@@ -169,27 +231,45 @@ export default function ListDetail() {
           />
         ) : (
           <>
-            <MaterialCommunityIcons
-              name={
-                item.done
-                  ? "checkbox-marked-circle"
-                  : "checkbox-blank-circle-outline"
-              }
-              size={24}
-              color={item.done ? "#10B981" : "#6B7280"}
-            />
-            <Text
-              style={[
-                styles.rowText,
-                item.done && styles.rowDone,
-                { marginLeft: 8 },
-              ]}
-            >
-              {item.title}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <MaterialCommunityIcons
+                name={
+                  item.done
+                    ? "checkbox-marked-circle"
+                    : "checkbox-blank-circle-outline"
+                }
+                size={24}
+                color={item.done ? "#10B981" : "#6B7280"}
+              />
+              <Text
+                style={[
+                  styles.rowText,
+                  item.done && styles.rowDone,
+                  { marginLeft: 8 },
+                ]}
+              >
+                {item.title}
+              </Text>
+            </View>
+            {item.dueDate && (
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: "#6B7280",
+                  marginLeft: 32,
+                  marginTop: 2,
+                }}
+              >
+                {new Date(item.dueDate).toLocaleString(undefined, {
+                  dateStyle: "short",
+                  timeStyle: "short",
+                })}
+              </Text>
+            )}
           </>
         )}
       </Pressable>
+
       <TouchableOpacity
         onPress={() => deleteTask(item.id)}
         style={{ padding: 16 }}
@@ -199,66 +279,21 @@ export default function ListDetail() {
     </View>
   );
 
-  /** Print-functie voor deze lijst (fout “Printing did not complete” negeren) */
-  const handlePrint = async () => {
-    const htmlLines = [
-      `<h1 style="font-family: sans-serif;">${currentLabel}</h1>`,
-      `<p style="font-family: sans-serif;">Taken:</p>`,
-      `<ul style="font-family: sans-serif;">`,
-      ...tasks.map(
-        (t) => `<li>${t.title} ${t.done ? "(✓ voltooid)" : "(✗ open)"}</li>`
-      ),
-      `</ul>`,
-    ];
-    const html = htmlLines.join("\n");
-
-    try {
-      await Print.printAsync({ html });
-    } catch (err: any) {
-      // Bij annuleren gooit printAsync vaak "Printing did not complete"
-      const msg = err?.message ?? "";
-      if (msg.includes("Printing did not complete")) {
-        // Gebruiker annuleerde de printdialoog: gewoon negeren
-        return;
-      }
-      console.error("Print-fout:", err);
-    }
-  };
-
-  // Stel header in (titel, back-button, deel-knop, opties-knop)
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: currentLabel,
-      headerBackTitle: "Go-To-Go",
-      headerRight: () => (
-        <RNView style={{ flexDirection: "row", marginRight: 16 }}>
-          {/* Deel-knop */}
-          <TouchableOpacity
-            onPress={() => setShowShare(true)}
-            style={{ marginRight: 16 }}
-          >
-            <Ionicons name="share-social-outline" size={24} color="#000" />
-          </TouchableOpacity>
-          {/* Opties-knop */}
-          <TouchableOpacity onPress={() => setShowOptions(true)}>
-            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
-          </TouchableOpacity>
-        </RNView>
-      ),
-    });
-  }, [navigation, currentLabel]);
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Bovenste balk met lijstnaam of TextInput */}
+      {/* Bovenste balk: lijstnaam of rename-input */}
       <View style={styles.header}>
         {isCustom ? (
-          isRenaming ? (
+          editingId === "rename" ? (
             <TextInput
-              value={renameText}
-              onChangeText={setRenameText}
-              onSubmitEditing={commitRename}
-              onBlur={commitRename}
+              value={editingText}
+              onChangeText={setEditingText}
+              onSubmitEditing={() => {
+                // commitRename indien je rename-functionaliteit hebt
+              }}
+              onBlur={() => {
+                // commitRename
+              }}
               autoFocus
               placeholder="Nieuwe lijstnaam"
               style={styles.renameInput}
@@ -266,22 +301,64 @@ export default function ListDetail() {
           ) : (
             <Pressable
               onPress={() => {
-                // Bij tik zetten we rename‐modus aan
-                setRenameText(currentLabel);
-                setIsRenaming(true);
+                setEditingText(
+                  lists.find((l) => l.key === listKey)?.label || ""
+                );
+                setEditingId("rename");
               }}
               style={{ flex: 1 }}
             >
-              <Text style={styles.headerTitle}>{currentLabel}</Text>
+              <Text style={styles.headerTitle}>
+                {lists.find((l) => l.key === listKey)?.label || "Lijst"}
+              </Text>
             </Pressable>
           )
         ) : (
-          <Text style={styles.headerTitle}>{currentLabel}</Text>
+          <Text style={styles.headerTitle}>
+            {lists.find((l) => l.key === listKey)?.label || "Lijst"}
+          </Text>
         )}
       </View>
 
-      {/* Invoerregel voor nieuwe taak */}
+      {/* Invoerregel + kalendericoon */}
       <View style={styles.inputRow}>
+        <TouchableOpacity style={{ marginRight: 8 }}>
+          <Ionicons
+            name="calendar-outline"
+            size={24}
+            color="#2563EB"
+            onPress={() => {
+              Keyboard.dismiss();
+              if (Platform.OS === "android") {
+                DateTimePickerAndroid.open({
+                  value: dueDate || new Date(),
+                  mode: "date",
+                  onChange: (event, selectedDate) => {
+                    if (event.type === "set" && selectedDate) {
+                      DateTimePickerAndroid.open({
+                        value: selectedDate,
+                        mode: "time",
+                        is24Hour: true,
+                        onChange: (evt2, selectedTime) => {
+                          if (evt2.type === "set" && selectedTime) {
+                            const combined = new Date(selectedDate);
+                            combined.setHours(
+                              selectedTime.getHours(),
+                              selectedTime.getMinutes()
+                            );
+                            setDueDate(combined);
+                          }
+                        },
+                      });
+                    }
+                  },
+                });
+              } else {
+                setShowDatePicker((prev) => !prev);
+              }
+            }}
+          />
+        </TouchableOpacity>
         <TextInput
           value={newTask}
           onChangeText={setNewTask}
@@ -293,14 +370,30 @@ export default function ListDetail() {
         </TouchableOpacity>
       </View>
 
+      {/* DatePicker onder de invoer */}
+      {Platform.OS === "ios" && showDatePicker && (
+        <View style={{ alignItems: "center", marginVertical: 8 }}>
+          <DateTimePicker
+            value={dueDate || new Date()}
+            mode="datetime"
+            display="inline"
+            onChange={(_, selectedDate) => {
+              if (selectedDate) setDueDate(selectedDate);
+            }}
+            style={{ width: "90%" }}
+          />
+        </View>
+      )}
+
+      {/* Takenlijst */}
       <FlatList
         data={tasks}
-        keyExtractor={(t) => t.id}
-        renderItem={renderTask}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={{ flexGrow: 1 }}
+        renderItem={renderTask}
       />
 
-      {/* Opties‐sheet */}
+      {/* Opties-modal */}
       <Modal
         visible={showOptions}
         transparent
@@ -309,13 +402,12 @@ export default function ListDetail() {
       >
         <View style={styles.modal}>
           <TouchableOpacity
-            style={RNStyleSheet.absoluteFill}
+            style={StyleSheet.absoluteFill}
             onPress={() => setShowOptions(false)}
           />
           <View style={styles.sheet}>
             <Text style={styles.modalTitle}>Opties</Text>
 
-            {/* Sorteren alfabetisch */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -329,10 +421,9 @@ export default function ListDetail() {
               <Text style={styles.rowText}>Sorteer alfabetisch</Text>
             </TouchableOpacity>
 
-            {/* Sorteren op datum */}
             <TouchableOpacity
               style={styles.row}
-              onPress={() => {
+              onPress={async () => {
                 setTasks((t) =>
                   [...t].sort((a, b) => Number(a.id) - Number(b.id))
                 );
@@ -343,7 +434,6 @@ export default function ListDetail() {
               <Text style={styles.rowText}>Sorteer op datum</Text>
             </TouchableOpacity>
 
-            {/* Kopie verzenden */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -355,7 +445,6 @@ export default function ListDetail() {
               <Text style={styles.rowText}>Kopie verzenden</Text>
             </TouchableOpacity>
 
-            {/* Lijst afdrukken */}
             <TouchableOpacity
               style={styles.row}
               onPress={async () => {
@@ -370,7 +459,7 @@ export default function ListDetail() {
         </View>
       </Modal>
 
-      {/* Share‐sheet */}
+      {/* Share-modal */}
       <Modal
         visible={showShare}
         transparent
@@ -378,28 +467,27 @@ export default function ListDetail() {
         onRequestClose={() => setShowShare(false)}
       >
         <KeyboardAvoidingView
-          style={styles.modal}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          keyboardVerticalOffset={0}
+          style={styles.modal}
         >
           <TouchableOpacity
-            style={RNStyleSheet.absoluteFill}
+            style={StyleSheet.absoluteFill}
             onPress={() => setShowShare(false)}
           />
-          <RNView style={styles.sheet}>
+          <View style={styles.sheet}>
             <ShareModal
-              listTitle={currentLabel}
+              listTitle={lists.find((l) => l.key === listKey)?.label || "Lijst"}
               tasks={tasks}
               onClose={() => setShowShare(false)}
             />
-          </RNView>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
 }
 
-const styles = RNStyleSheet.create({
+const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F3F4F6" },
   header: {
     flexDirection: "row",

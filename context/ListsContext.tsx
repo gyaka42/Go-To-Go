@@ -7,6 +7,7 @@ export interface Task {
   id: string;
   title: string;
   done: boolean;
+  dueDate: Date | null;
 }
 
 // Type voor een lijst-item in de navigatie

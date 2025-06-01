@@ -13,11 +13,11 @@ export default function MenuItem({ iconName, label, count, onPress }) {
           size={20}
           color="#4B5563"
           className="mr-3"
-          style={{ transform: [{ translateY: -4 }] }}
+          style={{ transform: [{ translateY: -1 }] }}
         />
         <Text
           className="text-base text-gray-800"
-          style={{ transform: [{ translateY: -4 }] }}
+          style={{ transform: [{ translateY: -1 }] }}
         >
           {label}
         </Text>
