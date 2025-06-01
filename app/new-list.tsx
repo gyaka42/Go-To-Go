@@ -288,6 +288,7 @@ export default function NewListScreen() {
         <TextInput
           value={newTask}
           onChangeText={setNewTask}
+          onFocus={() => setShowDatePicker(false)}
           placeholder="Nieuwe taak"
           placeholderTextColor="#666"
           style={[styles.input, { flex: 1 }]}

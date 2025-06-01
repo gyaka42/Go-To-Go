@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -20,11 +21,11 @@ import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const baseMenu: ListItem[] = [
-  { key: "mijnDag", icon: "weather-sunny", label: "Mijn dag", count: null },
+  { key: "mijnDag", icon: "person", label: "Mijn dag", count: null },
   { key: "belangrijk", icon: "star-outline", label: "Belangrijk", count: null },
   {
     key: "gepland",
-    icon: "calendar-blank-outline",
+    icon: "event-available",
     label: "Gepland",
     count: null,
   },
@@ -38,16 +39,14 @@ export default function HomeScreen() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  // Bij opstarten: laad eventueel eerder opgeslagen avatar‐URI uit AsyncStorage
+  // Laad avatar-URI bij opstarten
   useEffect(() => {
     AsyncStorage.getItem("user_avatar").then((uri) => {
-      if (uri) {
-        setAvatarUri(uri);
-      }
+      if (uri) setAvatarUri(uri);
     });
   }, []);
 
-  // Vraag permissie voor foto‐bibliotheek
+  // Vraag permissie voor fotobibliotheek
   useEffect(() => {
     (async () => {
       const { status } =
@@ -60,34 +59,26 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  // Functie: open galerij, laat gebruiker een foto kiezen, en sla URI op
+  // Functie om avatar te kiezen
   const pickAvatar = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        // Gebruik hier “MediaTypeOptions” om met v16.1.4-typings te blijven werken:
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
       });
-
-      // De nieuwe API gebruikt 'canceled' i.p.v. 'cancelled',
-      // en plaatst gekozen media in result.assets[0].uri
       if (!result.canceled && result.assets.length > 0) {
         const chosenUri = result.assets[0].uri;
         setAvatarUri(chosenUri);
-
-        // Sla URI permanent op in AsyncStorage
-        AsyncStorage.setItem("user_avatar", chosenUri).catch(() => {
-          console.warn("Kon avatar-URI niet opslaan in AsyncStorage");
-        });
+        await AsyncStorage.setItem("user_avatar", chosenUri);
       }
     } catch (err) {
       console.error("Fout bij openen galerij:", err);
     }
   };
 
-  // Bereken badge‐counts (aantal taken per lijst) elke keer dat "lists" verandert
+  // Bereken badge-counts telkens als lijsten veranderen
   useFocusEffect(
     useCallback(() => {
       const allKeys = [
@@ -108,7 +99,7 @@ export default function HomeScreen() {
     setLists((prev) => prev.filter((l) => l.key !== key));
   };
 
-  // Combineer standaard‐ en eigen lijsten, met de “count” uit tasksMap of AsyncStorage
+  // Combineer baseMenu + custom lijsten
   const combined = [...baseMenu, ...lists].map((item) => {
     const customTasks = tasksMap[item.key];
     return {
@@ -121,12 +112,8 @@ export default function HomeScreen() {
   });
 
   return (
-    <SafeAreaView
-      // Zet hier expliciet alle veilige randen aan, inclusief 'top'
-      edges={["left", "right"]}
-      style={styles.container}
-    >
-      {/* Header met klikbare avatar */}
+    <SafeAreaView edges={["left", "right", "bottom"]} style={styles.container}>
+      {/* Header met avatar en gebruikerstitel */}
       <Header
         username="Gökhan Yaka"
         avatarSource={
@@ -136,62 +123,143 @@ export default function HomeScreen() {
         onAvatarPress={pickAvatar}
       />
 
-      {/* Overzicht van alle lijsten */}
+      {/* "Welkom" of korte intro onder de header */}
+      <View style={styles.welcomeContainer}>
+        <Text style={styles.welcomeText}>Welkom terug, Gökhan!</Text>
+        <Text style={styles.subtitleText}>
+          Hier zijn je to-do’s voor vandaag:
+        </Text>
+      </View>
+
+      {/* Overzicht van alle lijsten, met cardstijl */}
       <FlatList
         data={combined}
         keyExtractor={(item) => item.key}
+        contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={({ item }) => {
           const isCustom = lists.some((l) => l.key === item.key);
           return (
-            <View style={styles.listRow}>
-              <View style={{ flex: 1 }}>
-                <MenuItem
-                  iconName={item.icon}
-                  label={item.label}
-                  onPress={() => router.push(`/list/${item.key}`)}
-                  count={undefined}
+            <View style={styles.card}>
+              <TouchableOpacity
+                style={styles.cardContent}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/list/${item.key}`)}
+              >
+                <MaterialIcons
+                  name={item.icon as any}
+                  size={28}
+                  color="#3B82F6"
+                  style={styles.cardIcon}
                 />
-              </View>
+                <Text style={styles.cardLabel}>{item.label}</Text>
+                <View style={styles.spacer} />
+                {item.count != null && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{item.count}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
               {isCustom && (
                 <TouchableOpacity
                   onPress={() => deleteList(item.key)}
                   style={styles.deleteIcon}
                 >
-                  <MaterialIcons name="delete" size={20} color="#EF4444" />
+                  <MaterialIcons name="delete" size={24} color="#EF4444" />
                 </TouchableOpacity>
-              )}
-              {item.count != null && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{item.count}</Text>
-                </View>
               )}
             </View>
           );
         }}
       />
-
-      <BottomBar onNewList={() => router.push("/new-list")} />
+      {/* Onderbalk met "Nieuwe lijst" knop */}
+      <View
+        style={{
+          position: "absolute",
+          bottom: 16, // zorgt dat de balk zweeft, 16pt vanaf onderkant
+          left: 0,
+          right: 0,
+          alignItems: "center",
+        }}
+      >
+        <View style={{ width: "90%" }}>
+          <BottomBar onNewList={() => router.push("/new-list")} />
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFF" },
-  listRow: {
+  container: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+  welcomeContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#FFF",
+    // verwijderen van borderBottom
+    marginBottom: 12,
+  },
+  welcomeText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  subtitleText: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  card: {
+    marginHorizontal: 12,
+    marginVertical: 4,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 2,
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
   },
-  deleteIcon: { padding: 8, marginLeft: 8 },
+  cardContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  cardIcon: {
+    marginRight: 8,
+  },
+  cardLabel: {
+    fontSize: 16,
+    color: "#111827",
+    fontWeight: "600",
+  },
+  spacer: {
+    flex: 1,
+  },
   badge: {
     backgroundColor: "#3B82F6",
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginLeft: 8,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
   },
-  badgeText: { color: "#FFF", fontSize: 12, fontWeight: "600" },
+  badgeText: {
+    color: "#FFF",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  deleteIcon: {
+    padding: 8,
+    marginRight: 4,
+  },
+
+  // BottomBar en header styling blijven gelijk
 });

@@ -9,15 +9,29 @@ export default function Header({
   onAvatarPress,
 }) {
   return (
-    <View className="flex-row items-center justify-between p-4 bg-white">
-      <View className="flex-row items-center">
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        backgroundColor: "#FFF",
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
         {/* Avatar nu aanklikbaar */}
         <TouchableOpacity onPress={onAvatarPress}>
-          <Image source={avatarSource} className="w-8 h-8 rounded-full mr-3" />
+          <Image
+            source={avatarSource}
+            style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }}
+          />
         </TouchableOpacity>
-        <Text className="text-lg font-semibold">{username}</Text>
+        <Text style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}>
+          {username}
+        </Text>
       </View>
-      <TouchableOpacity onPress={onSearch} className="p-2">
+      <TouchableOpacity onPress={onSearch} style={{ padding: 8 }}>
         <Ionicons name="search" size={24} color="#333" />
       </TouchableOpacity>
     </View>

@@ -387,6 +387,7 @@ export default function ListDetail() {
         <TextInput
           value={newTask}
           onChangeText={setNewTask}
+          onFocus={() => setShowDatePicker(false)}
           placeholder="Nieuwe taak"
           style={styles.input}
         />
