@@ -30,7 +30,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ListDetail() {
   // --- ROUTER & CONTEXT ---
-  const { key } = useLocalSearchParams(); // key uit URL
+  const { key } = useLocalSearchParams();
   const listKey = Array.isArray(key) ? key[0] : key;
   const router = useRouter();
   const navigation = useNavigation();
@@ -45,15 +45,30 @@ export default function ListDetail() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // --- STATE FOR EDITING & MODALS ---
+  // editingId = "rename" or a task-id
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
-  // --- LOAD TASKS ONCE (NO CIRCULAR UPDATES) ---
+  // --- NYE STATE: FILTER MODE ---
+  // "all" = alle taken, "open" = alleen open, "done" = alleen voltooide
+  const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
+
+  // --- FUNCTIE OM LIJSTNAAM TE OPSLAAN ---
+  const commitRename = () => {
+    const trimmed = editingText.trim();
+    if (trimmed) {
+      setLists((prev) =>
+        prev.map((l) => (l.key === listKey ? { ...l, label: trimmed } : l))
+      );
+    }
+    setEditingId(null);
+  };
+
+  // --- LAAD TASKS ÉÉN KEER ---
   useEffect(() => {
     if (isCustom) {
-      // Custom lijst: laad uit context (tasksMap)
       const saved = tasksMap[listKey] || [];
       const parsed = saved.map((t) => ({
         ...t,
@@ -61,7 +76,6 @@ export default function ListDetail() {
       }));
       setTasks(parsed);
     } else {
-      // Standaardlijst: laad uit AsyncStorage
       AsyncStorage.getItem(`todos_${listKey}`)
         .then((json) => {
           const savedTasks: (Task & { dueDate: string | null })[] = json
@@ -79,7 +93,7 @@ export default function ListDetail() {
     }
   }, [listKey, isCustom]);
 
-  // --- SYNC TASKS BACK TO CONTEXT / STORAGE WHEN CHANGED ---
+  // --- SYNC BACK NAAR CONTEXT/STORAGE ---
   useEffect(() => {
     if (isCustom) {
       setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
@@ -89,13 +103,12 @@ export default function ListDetail() {
       );
       setTasksMap((prev) => ({ ...prev, [listKey]: tasks }));
     }
-    // Update badge‐count in context‐lists
     setLists((prev) =>
       prev.map((l) => (l.key === listKey ? { ...l, count: tasks.length } : l))
     );
   }, [tasks]);
 
-  // --- SCHEDULE NOTIFICATION HELPER ---
+  // --- SCHEDULE LOCAL NOTIFICATIONS ---
   async function scheduleReminder(title: string, date: Date) {
     const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
     if (seconds <= 0) return;
@@ -117,7 +130,7 @@ export default function ListDetail() {
     }
   }
 
-  // --- ADD TASK (INCL. DUE DATE & NOTIFICATIES) ---
+  // --- ADD TASK MET OPCIONELE DUE DATE ---
   const addTask = () => {
     if (!newTask.trim()) return;
     const task: Task = {
@@ -156,7 +169,7 @@ export default function ListDetail() {
     setEditingId(null);
   };
 
-  // --- PRINT FUNCTION ---
+  // --- PRINT LIJST ---
   const handlePrint = async () => {
     const htmlLines = [
       `<h1 style="font-family: sans-serif;">${
@@ -187,7 +200,7 @@ export default function ListDetail() {
     }
   };
 
-  // --- SET UP HEADER (DEEL & OPTIES) ---
+  // --- NAVIGATION HEADER INSTELLEN ---
   useLayoutEffect(() => {
     navigation.setOptions({
       title: lists.find((l) => l.key === listKey)?.label || "Lijst",
@@ -208,7 +221,25 @@ export default function ListDetail() {
     });
   }, [navigation, lists, listKey]);
 
-  // --- RENDEREN PER TASK ---
+  // --- OPSLAAN WANNEER TERUG OF BUITEN GEBEURENIS ---
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", () => {
+      if (editingId === "rename") {
+        commitRename();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, editingId, commitRename]);
+
+  // --- FILTER LOGICA TOEVOEGEN ---
+  // filteredTasks houdt alleen de taken die bij filterMode passen
+  const filteredTasks = tasks.filter((t) => {
+    if (filterMode === "open") return !t.done;
+    if (filterMode === "done") return t.done;
+    return true; // "all"
+  });
+
+  // --- RENDEREN VAN ÉÉN TAKENREGEL ---
   const renderTask = ({ item }: { item: Task }) => (
     <View style={styles.rowFront}>
       <Pressable
@@ -281,19 +312,15 @@ export default function ListDetail() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Bovenste balk: lijstnaam of rename-input */}
+      {/* Bovenste balk: lijstnaam of bewerk-input */}
       <View style={styles.header}>
         {isCustom ? (
           editingId === "rename" ? (
             <TextInput
               value={editingText}
               onChangeText={setEditingText}
-              onSubmitEditing={() => {
-                // commitRename indien je rename-functionaliteit hebt
-              }}
-              onBlur={() => {
-                // commitRename
-              }}
+              onSubmitEditing={commitRename}
+              onBlur={commitRename}
               autoFocus
               placeholder="Nieuwe lijstnaam"
               style={styles.renameInput}
@@ -320,44 +347,42 @@ export default function ListDetail() {
         )}
       </View>
 
-      {/* Invoerregel + kalendericoon */}
+      {/* Invoerveld + kalendericoon */}
       <View style={styles.inputRow}>
-        <TouchableOpacity style={{ marginRight: 8 }}>
-          <Ionicons
-            name="calendar-outline"
-            size={24}
-            color="#2563EB"
-            onPress={() => {
-              Keyboard.dismiss();
-              if (Platform.OS === "android") {
-                DateTimePickerAndroid.open({
-                  value: dueDate || new Date(),
-                  mode: "date",
-                  onChange: (event, selectedDate) => {
-                    if (event.type === "set" && selectedDate) {
-                      DateTimePickerAndroid.open({
-                        value: selectedDate,
-                        mode: "time",
-                        is24Hour: true,
-                        onChange: (evt2, selectedTime) => {
-                          if (evt2.type === "set" && selectedTime) {
-                            const combined = new Date(selectedDate);
-                            combined.setHours(
-                              selectedTime.getHours(),
-                              selectedTime.getMinutes()
-                            );
-                            setDueDate(combined);
-                          }
-                        },
-                      });
-                    }
-                  },
-                });
-              } else {
-                setShowDatePicker((prev) => !prev);
-              }
-            }}
-          />
+        <TouchableOpacity
+          style={{ marginRight: 8 }}
+          onPress={() => {
+            Keyboard.dismiss();
+            if (Platform.OS === "android") {
+              DateTimePickerAndroid.open({
+                value: dueDate || new Date(),
+                mode: "date",
+                onChange: (event, selectedDate) => {
+                  if (event.type === "set" && selectedDate) {
+                    DateTimePickerAndroid.open({
+                      value: selectedDate,
+                      mode: "time",
+                      is24Hour: true,
+                      onChange: (evt2, selectedTime) => {
+                        if (evt2.type === "set" && selectedTime) {
+                          const combined = new Date(selectedDate);
+                          combined.setHours(
+                            selectedTime.getHours(),
+                            selectedTime.getMinutes()
+                          );
+                          setDueDate(combined);
+                        }
+                      },
+                    });
+                  }
+                },
+              });
+            } else {
+              setShowDatePicker((prev) => !prev);
+            }
+          }}
+        >
+          <Ionicons name="calendar-outline" size={24} color="#2563EB" />
         </TouchableOpacity>
         <TextInput
           value={newTask}
@@ -370,7 +395,7 @@ export default function ListDetail() {
         </TouchableOpacity>
       </View>
 
-      {/* DatePicker onder de invoer */}
+      {/* Inline DateTimePicker alleen op iOS */}
       {Platform.OS === "ios" && showDatePicker && (
         <View style={{ alignItems: "center", marginVertical: 8 }}>
           <DateTimePicker
@@ -385,9 +410,62 @@ export default function ListDetail() {
         </View>
       )}
 
-      {/* Takenlijst */}
+      {/* --- HIER KOMT DE NIEUWE FILTER‐TOGGLE ----------------- */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            filterMode === "all" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilterMode("all")}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              filterMode === "all" && styles.filterTextActive,
+            ]}
+          >
+            Alles
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            filterMode === "open" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilterMode("open")}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              filterMode === "open" && styles.filterTextActive,
+            ]}
+          >
+            Open
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            filterMode === "done" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilterMode("done")}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              filterMode === "done" && styles.filterTextActive,
+            ]}
+          >
+            Voltooid
+          </Text>
+        </TouchableOpacity>
+      </View>
+      {/* ------------------------------------------------------- */}
+
+      {/* Takenlijst: gebruik nu filteredTasks i.p.v. tasks */}
       <FlatList
-        data={tasks}
+        data={filteredTasks}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ flexGrow: 1 }}
         renderItem={renderTask}
@@ -407,7 +485,7 @@ export default function ListDetail() {
           />
           <View style={styles.sheet}>
             <Text style={styles.modalTitle}>Opties</Text>
-
+            {/* Sorteer alfabetisch */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -420,10 +498,10 @@ export default function ListDetail() {
               <Ionicons name="swap-vertical" size={24} color="#333" />
               <Text style={styles.rowText}>Sorteer alfabetisch</Text>
             </TouchableOpacity>
-
+            {/* Sorteer op datum */}
             <TouchableOpacity
               style={styles.row}
-              onPress={async () => {
+              onPress={() => {
                 setTasks((t) =>
                   [...t].sort((a, b) => Number(a.id) - Number(b.id))
                 );
@@ -433,7 +511,7 @@ export default function ListDetail() {
               <Ionicons name="calendar" size={24} color="#333" />
               <Text style={styles.rowText}>Sorteer op datum</Text>
             </TouchableOpacity>
-
+            {/* Kopie verzenden */}
             <TouchableOpacity
               style={styles.row}
               onPress={() => {
@@ -444,7 +522,7 @@ export default function ListDetail() {
               <Ionicons name="share-social-outline" size={24} color="#333" />
               <Text style={styles.rowText}>Kopie verzenden</Text>
             </TouchableOpacity>
-
+            {/* Lijst afdrukken */}
             <TouchableOpacity
               style={styles.row}
               onPress={async () => {
@@ -520,6 +598,32 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   addBtn: { marginLeft: 8 },
+  /** NIEUWE STIJLEN VOOR FILTER **/
+  filterRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    backgroundColor: "#FFF",
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  filterButtonActive: {
+    backgroundColor: "#3B82F6",
+  },
+  filterText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  filterTextActive: {
+    color: "#FFF",
+    fontWeight: "600",
+  },
+  /** EINDE FILTER STIJLEN **/
   rowFront: {
     flexDirection: "row",
     alignItems: "center",

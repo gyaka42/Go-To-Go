@@ -32,6 +32,8 @@ export default function SearchScreen() {
   const { lists, tasksMap } = useContext(ListsContext);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  // toegevoegde filterMode state
+  const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
   const router = useRouter();
 
   useEffect(() => {
@@ -67,6 +69,13 @@ export default function SearchScreen() {
     })();
   }, [query, lists, tasksMap]);
 
+  // Filter resultaten op basis van filterMode
+  const filteredResults = results.filter((t) => {
+    if (filterMode === "open") return !t.done;
+    if (filterMode === "done") return t.done;
+    return true;
+  });
+
   return (
     <SafeAreaView style={styles.container}>
       <TextInput
@@ -77,9 +86,60 @@ export default function SearchScreen() {
         autoCorrect={false}
         autoCapitalize="none"
       />
+      {/* Filter knoppenrij */}
+      <View style={styles.filterRow}>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            filterMode === "all" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilterMode("all")}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              filterMode === "all" && styles.filterTextActive,
+            ]}
+          >
+            Alles
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            filterMode === "open" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilterMode("open")}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              filterMode === "open" && styles.filterTextActive,
+            ]}
+          >
+            Open
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.filterButton,
+            filterMode === "done" && styles.filterButtonActive,
+          ]}
+          onPress={() => setFilterMode("done")}
+        >
+          <Text
+            style={[
+              styles.filterText,
+              filterMode === "done" && styles.filterTextActive,
+            ]}
+          >
+            Voltooid
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <FlatList
-        data={results}
+        data={filteredResults}
         keyExtractor={(item) => item.id + "@" + item.listKey}
         ListEmptyComponent={() =>
           query.trim() ? (
@@ -108,6 +168,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     margin: 16,
+  },
+  filterRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  filterButtonActive: {
+    backgroundColor: "#3B82F6",
+  },
+  filterText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  filterTextActive: {
+    color: "#FFF",
+    fontWeight: "600",
   },
   row: {
     paddingHorizontal: 16,
