@@ -38,6 +38,20 @@ export default function ListDetail() {
 
   const isCustom = lists.some((l) => l.key === listKey);
 
+  // Metadata for standard lists
+  const baseMenu = [
+    { key: "mijnDag", label: "Mijn dag" },
+    { key: "belangrijk", label: "Belangrijk" },
+    { key: "gepland", label: "Gepland" },
+    { key: "taken", label: "Taken" },
+  ];
+
+  // Determine display label: custom if exists, otherwise standard, otherwise fallback "Lijst"
+  const listLabel =
+    lists.find((l) => l.key === listKey)?.label ||
+    baseMenu.find((m) => m.key === listKey)?.label ||
+    "Lijst";
+
   // --- STATE FOR TASKS & REMINDERS ---
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState("");
@@ -203,7 +217,7 @@ export default function ListDetail() {
   // --- NAVIGATION HEADER INSTELLEN ---
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: lists.find((l) => l.key === listKey)?.label || "Lijst",
+      title: listLabel,
       headerBackTitle: "Go-To-Go",
       headerRight: () => (
         <View style={{ flexDirection: "row", marginRight: 16 }}>
@@ -219,7 +233,7 @@ export default function ListDetail() {
         </View>
       ),
     });
-  }, [navigation, lists, listKey]);
+  }, [navigation, lists, listKey, listLabel]);
 
   // --- OPSLAAN WANNEER TERUG OF BUITEN GEBEURENIS ---
   useEffect(() => {
@@ -241,7 +255,7 @@ export default function ListDetail() {
 
   // --- RENDEREN VAN ÉÉN TAKENREGEL ---
   const renderTask = ({ item }: { item: Task }) => (
-    <View style={styles.rowFront}>
+    <View style={styles.taskCard}>
       <Pressable
         onPress={() => toggleTask(item.id)}
         onLongPress={() => {
@@ -313,7 +327,7 @@ export default function ListDetail() {
   return (
     <SafeAreaView style={styles.container}>
       {/* Bovenste balk: lijstnaam of bewerk-input */}
-      <View style={styles.header}>
+      <View style={styles.headerCard}>
         {isCustom ? (
           editingId === "rename" ? (
             <TextInput
@@ -328,27 +342,21 @@ export default function ListDetail() {
           ) : (
             <Pressable
               onPress={() => {
-                setEditingText(
-                  lists.find((l) => l.key === listKey)?.label || ""
-                );
+                setEditingText(listLabel);
                 setEditingId("rename");
               }}
               style={{ flex: 1 }}
             >
-              <Text style={styles.headerTitle}>
-                {lists.find((l) => l.key === listKey)?.label || "Lijst"}
-              </Text>
+              <Text style={styles.headerTitle}>{listLabel}</Text>
             </Pressable>
           )
         ) : (
-          <Text style={styles.headerTitle}>
-            {lists.find((l) => l.key === listKey)?.label || "Lijst"}
-          </Text>
+          <Text style={styles.headerTitle}>{listLabel}</Text>
         )}
       </View>
 
       {/* Invoerveld + kalendericoon */}
-      <View style={styles.inputRow}>
+      <View style={styles.inputCard}>
         <TouchableOpacity
           style={{ marginRight: 8 }}
           onPress={() => {
@@ -567,46 +575,88 @@ export default function ListDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F3F4F6" },
-  header: {
+  container: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+  },
+  headerCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 12,
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 2,
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    backgroundColor: "#FFF",
   },
-  headerTitle: { fontSize: 20, fontWeight: "600" },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#111827",
+  },
   renameInput: {
     flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
-    borderRadius: 6,
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     fontSize: 18,
-    backgroundColor: "#FFF",
+    backgroundColor: "#F9FAFB",
   },
-  inputRow: {
+  inputCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
     backgroundColor: "#FFF",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 1,
+  },
+  iconButton: {
+    marginRight: 8,
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: "#E5E7EB",
     borderRadius: 8,
     padding: 8,
+    backgroundColor: "#F9FAFB",
   },
-  addBtn: { marginLeft: 8 },
-  /** NIEUWE STIJLEN VOOR FILTER **/
+  addBtn: {
+    marginLeft: 8,
+  },
   filterRow: {
     flexDirection: "row",
     justifyContent: "space-around",
     backgroundColor: "#FFF",
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    borderRadius: 12,
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 1,
   },
   filterButton: {
     paddingHorizontal: 12,
@@ -615,6 +665,7 @@ const styles = StyleSheet.create({
   },
   filterButtonActive: {
     backgroundColor: "#3B82F6",
+    borderRadius: 6,
   },
   filterText: {
     fontSize: 14,
@@ -624,18 +675,35 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontWeight: "600",
   },
-  /** EINDE FILTER STIJLEN **/
-  rowFront: {
+  taskCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFF",
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 12,
     padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 1,
   },
-  rowText: { marginLeft: 12, fontSize: 16, color: "#333" },
-  rowDone: { textDecorationLine: "line-through", color: "#9CA3AF" },
-  deleteX: { color: "#EF4444", fontWeight: "700" },
+  rowText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: "#333",
+  },
+  rowDone: {
+    textDecorationLine: "line-through",
+    color: "#9CA3AF",
+  },
+  deleteX: {
+    color: "#EF4444",
+    fontWeight: "700",
+  },
   modal: {
     flex: 1,
     justifyContent: "flex-end",
@@ -648,6 +716,14 @@ const styles = StyleSheet.create({
     padding: 16,
     maxHeight: "50%",
   },
-  modalTitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
-  row: { flexDirection: "row", alignItems: "center", paddingVertical: 12 },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
 });

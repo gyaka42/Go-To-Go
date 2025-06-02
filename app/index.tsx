@@ -1,6 +1,7 @@
 // app/index.tsx
 import React, { useState, useEffect, useContext, useCallback } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   View,
   Text,
@@ -36,17 +37,40 @@ export default function HomeScreen() {
   const router = useRouter();
   const { lists, setLists, tasksMap } = useContext(ListsContext);
 
+  // 1️⃣ Hooks die we altijd willen aanroepen – óók voordat we weten of we isReady zijn:
+  const [isReady, setIsReady] = useState(false);
+  const [userName, setUserName] = useState<string | null>(null);
+
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
-  // Laad avatar-URI bij opstarten
+  // 2️⃣ Effect: eerst controleren of er een “user_name” in AsyncStorage staat
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const name = await AsyncStorage.getItem("user_name");
+        if (!name) {
+          router.replace("/onboarding");
+          return;
+        }
+        setUserName(name);
+      } catch (err) {
+        console.error("Fout bij ophalen user_name:", err);
+      } finally {
+        setIsReady(true);
+      }
+    };
+    checkOnboarding();
+  }, [router]);
+
+  // 3️⃣ Effect: avatar-URI ophalen (onafhankelijk van isReady)
   useEffect(() => {
     AsyncStorage.getItem("user_avatar").then((uri) => {
       if (uri) setAvatarUri(uri);
     });
   }, []);
 
-  // Vraag permissie voor fotobibliotheek
+  // 4️⃣ Effect: permissie voor fotobibliotheek vragen
   useEffect(() => {
     (async () => {
       const { status } =
@@ -59,26 +83,7 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  // Functie om avatar te kiezen
-  const pickAvatar = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-      if (!result.canceled && result.assets.length > 0) {
-        const chosenUri = result.assets[0].uri;
-        setAvatarUri(chosenUri);
-        await AsyncStorage.setItem("user_avatar", chosenUri);
-      }
-    } catch (err) {
-      console.error("Fout bij openen galerij:", err);
-    }
-  };
-
-  // Bereken badge-counts telkens als lijsten veranderen
+  // 5️⃣ useFocusEffect: badge‐counts telkens als lijsten veranderen
   useFocusEffect(
     useCallback(() => {
       const allKeys = [
@@ -95,11 +100,12 @@ export default function HomeScreen() {
     }, [lists])
   );
 
+  // 6️⃣ Hook voor verwijderen van een custom lijstje
   const deleteList = (key: string) => {
     setLists((prev) => prev.filter((l) => l.key !== key));
   };
 
-  // Combineer baseMenu + custom lijsten
+  // 7️⃣ Bereken welke items getoond worden op de home‐pagina
   const combined = [...baseMenu, ...lists].map((item) => {
     const customTasks = tasksMap[item.key];
     return {
@@ -111,27 +117,57 @@ export default function HomeScreen() {
     };
   });
 
+  // ──────────────────────────────────────────────────────
+  // 8️⃣ Pas na alle “unconditional hooks”
+  //     doen we de early return voor de loader:
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  // 9️⃣ Eindelijk, zodra isReady === true, renderen we de Home‐UI:
   return (
     <SafeAreaView edges={["left", "right", "bottom"]} style={styles.container}>
-      {/* Header met avatar en gebruikerstitel */}
+      {/* Header met avatar en gebruikersnaam */}
       <Header
-        username="Gökhan Yaka"
+        username={userName || "Gebruiker"}
         avatarSource={
           avatarUri ? { uri: avatarUri } : require("../assets/avatar.png")
         }
         onSearch={() => router.push("/search")}
-        onAvatarPress={pickAvatar}
+        onAvatarPress={async () => {
+          try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [1, 1],
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets.length > 0) {
+              const chosenUri = result.assets[0].uri;
+              setAvatarUri(chosenUri);
+              await AsyncStorage.setItem("user_avatar", chosenUri);
+            }
+          } catch (err) {
+            console.error("Fout bij openen galerij:", err);
+          }
+        }}
       />
 
-      {/* "Welkom" of korte intro onder de header */}
+      {/* Welkomsttekst onder header */}
       <View style={styles.welcomeContainer}>
-        <Text style={styles.welcomeText}>Welkom terug, Gökhan!</Text>
+        <Text style={styles.welcomeText}>
+          Welkom terug{userName ? `, ${userName}` : ""}!
+        </Text>
         <Text style={styles.subtitleText}>
           Hier zijn je to-do’s voor vandaag:
         </Text>
       </View>
 
-      {/* Overzicht van alle lijsten, met cardstijl */}
+      {/* FlatList met alle kaarten */}
       <FlatList
         data={combined}
         keyExtractor={(item) => item.key}
@@ -172,11 +208,12 @@ export default function HomeScreen() {
           );
         }}
       />
-      {/* Onderbalk met "Nieuwe lijst" knop */}
+
+      {/* Onderbalk met “Nieuwe lijst” knop */}
       <View
         style={{
           position: "absolute",
-          bottom: 16, // zorgt dat de balk zweeft, 16pt vanaf onderkant
+          bottom: 16,
           left: 0,
           right: 0,
           alignItems: "center",
@@ -199,7 +236,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     backgroundColor: "#FFF",
-    // verwijderen van borderBottom
     marginBottom: 12,
   },
   welcomeText: {
@@ -217,12 +253,10 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     backgroundColor: "#FFF",
     borderRadius: 12,
-    // iOS shadow
     shadowColor: "#000",
     shadowOpacity: 0.04,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
-    // Android elevation
     elevation: 2,
     flexDirection: "row",
     alignItems: "center",
@@ -260,6 +294,4 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 4,
   },
-
-  // BottomBar en header styling blijven gelijk
 });

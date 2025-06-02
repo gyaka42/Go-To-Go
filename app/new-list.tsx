@@ -11,13 +11,13 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
   StyleSheet,
   Modal,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -136,7 +136,7 @@ export default function NewListScreen() {
   }: {
     item: { id: string; title: string; done: boolean; dueDate: Date | null };
   }) => (
-    <View style={styles.rowFront}>
+    <View style={styles.taskCard}>
       <TouchableOpacity
         onPress={() => toggleTask(item.id)}
         onLongPress={() => {
@@ -234,56 +234,54 @@ export default function NewListScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView edges={["left", "right", "bottom"]} style={styles.container}>
+      <View style={styles.headerCard}>
         <TextInput
           value={title}
           onChangeText={setTitle}
           placeholder="Naamloze lijst"
           placeholderTextColor="#444"
-          style={[styles.titleInput, { marginLeft: 16 }]}
+          style={styles.titleInput}
         />
       </View>
 
-      <View style={styles.inputRow}>
-        <TouchableOpacity style={{ marginRight: 8 }}>
-          <Ionicons
-            name="calendar-outline"
-            size={24}
-            color="#2563EB"
-            onPress={() => {
-              Keyboard.dismiss();
-              if (Platform.OS === "android") {
-                // Two-step picker: first date, then time
-                DateTimePickerAndroid.open({
-                  value: dueDate || new Date(),
-                  mode: "date",
-                  onChange: (event, selectedDate) => {
-                    if (event.type === "set" && selectedDate) {
-                      // After picking date, open time picker
-                      DateTimePickerAndroid.open({
-                        value: selectedDate,
-                        mode: "time",
-                        is24Hour: true,
-                        onChange: (evt2, selectedTime) => {
-                          if (evt2.type === "set" && selectedTime) {
-                            const combined = new Date(selectedDate);
-                            combined.setHours(
-                              selectedTime.getHours(),
-                              selectedTime.getMinutes()
-                            );
-                            setDueDate(combined);
-                          }
-                        },
-                      });
-                    }
-                  },
-                });
-              } else {
-                setShowDatePicker((prev) => !prev);
-              }
-            }}
-          />
+      <View style={styles.inputCard}>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={() => {
+            Keyboard.dismiss();
+            if (Platform.OS === "android") {
+              // Two-step picker: first date, then time
+              DateTimePickerAndroid.open({
+                value: dueDate || new Date(),
+                mode: "date",
+                onChange: (event, selectedDate) => {
+                  if (event.type === "set" && selectedDate) {
+                    // After picking date, open time picker
+                    DateTimePickerAndroid.open({
+                      value: selectedDate,
+                      mode: "time",
+                      is24Hour: true,
+                      onChange: (evt2, selectedTime) => {
+                        if (evt2.type === "set" && selectedTime) {
+                          const combined = new Date(selectedDate);
+                          combined.setHours(
+                            selectedTime.getHours(),
+                            selectedTime.getMinutes()
+                          );
+                          setDueDate(combined);
+                        }
+                      },
+                    });
+                  }
+                },
+              });
+            } else {
+              setShowDatePicker((prev) => !prev);
+            }
+          }}
+        >
+          <Ionicons name="calendar-outline" size={24} color="#2563EB" />
         </TouchableOpacity>
         <TextInput
           value={newTask}
@@ -291,14 +289,14 @@ export default function NewListScreen() {
           onFocus={() => setShowDatePicker(false)}
           placeholder="Nieuwe taak"
           placeholderTextColor="#666"
-          style={[styles.input, { flex: 1 }]}
+          style={styles.input}
         />
         <TouchableOpacity onPress={addTask} style={styles.addBtn}>
           <Ionicons name="add-circle-outline" size={28} color="#2563EB" />
         </TouchableOpacity>
       </View>
       {Platform.OS === "ios" && showDatePicker && (
-        <View style={{ alignItems: "center", marginVertical: 8 }}>
+        <View style={styles.datePickerContainer}>
           <DateTimePicker
             value={dueDate || new Date()}
             mode="datetime"
@@ -314,7 +312,7 @@ export default function NewListScreen() {
       <FlatList
         data={tasks}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={renderTask}
       />
 
@@ -421,20 +419,43 @@ export default function NewListScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F3F4F6" },
-  header: { padding: 16, backgroundColor: "#FFF" },
+  headerCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    padding: 12,
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 2,
+  },
   titleInput: {
     fontSize: 24,
     fontWeight: "700",
     color: "#111",
-    backgroundColor: "#FFF",
   },
-  inputRow: {
+  inputCard: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    marginHorizontal: 16,
+    marginTop: 12,
     backgroundColor: "#FFF",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 1,
   },
+  iconButton: { marginRight: 8 },
   input: {
     flex: 1,
     borderWidth: 1,
@@ -443,13 +464,21 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   addBtn: { marginLeft: 8 },
-  rowFront: {
+  taskCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFF",
+    marginHorizontal: 16,
+    marginVertical: 4,
+    borderRadius: 12,
     padding: 12,
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
+    // iOS shadow
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    // Android elevation
+    elevation: 1,
   },
   rowText: { marginLeft: 12, fontSize: 16, color: "#333" },
   rowDone: { textDecorationLine: "line-through", color: "#9CA3AF" },
@@ -477,5 +506,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
+  },
+  datePickerContainer: {
+    alignItems: "center",
+    marginTop: 8,
+    marginBottom: 16,
   },
 });
