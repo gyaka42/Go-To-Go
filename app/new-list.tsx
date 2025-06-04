@@ -1,6 +1,5 @@
 // app/new-list.tsx
 import React, { useState, useContext, useEffect, useLayoutEffect } from "react";
-import * as Notifications from "expo-notifications";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
@@ -23,6 +22,8 @@ import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { ListsContext } from "../context/ListsContext";
 import * as Print from "expo-print";
+import useTasks from "../hooks/useTasks";
+import OptionsSheet from "../components/OptionsSheet";
 
 export default function NewListScreen() {
   const router = useRouter();
@@ -75,53 +76,12 @@ export default function NewListScreen() {
     });
   }, [navigation, setLists, setTasksMap, title, tasks]);
 
-  async function scheduleReminder(title: string, date: Date) {
-    const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
-    if (seconds <= 0) return; // voorkom directe melding bij verleden datum
-
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Taakherinnering",
-          body: title,
-          sound: "default",
-        },
-        trigger: {
-          type: "timeInterval" as any, // ⛑️ forceer correct type
-          seconds: Math.floor((date.getTime() - Date.now()) / 1000),
-          repeats: false,
-        },
-      });
-    } catch (err) {
-      console.error("Kon herinnering niet plannen:", err);
-    }
-  }
+  const { addTask: addTaskOp, toggleTask, deleteTask } = useTasks(tasks, setTasks);
 
   const addTask = async () => {
-    if (!newTask.trim()) return;
-    const task = {
-      id: Date.now().toString(),
-      title: newTask.trim(),
-      done: false,
-      dueDate: dueDate || null,
-    };
-    setTasks((prev) => [...prev, task]);
+    await addTaskOp(newTask, dueDate);
     setNewTask("");
-
-    if (dueDate) {
-      await scheduleReminder(task.title, dueDate);
-      setDueDate(null);
-    }
-  };
-
-  const toggleTask = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-  };
-
-  const deleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    if (dueDate) setDueDate(null);
   };
 
   const commitEdit = (id: string) => {
@@ -324,66 +284,30 @@ export default function NewListScreen() {
         onRequestClose={() => setShowOptions(false)}
       >
         <View style={styles.modal}>
-          {/* backdrop om te sluiten */}
           <TouchableOpacity
             style={StyleSheet.absoluteFill}
             onPress={() => setShowOptions(false)}
           />
-          <View style={styles.sheet}>
-            <Text style={styles.modalTitle}>Opties</Text>
-
-            {/* Sorteren alfabetisch */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setTasks((t) =>
-                  [...t].sort((a, b) => a.title.localeCompare(b.title))
-                );
-                setShowOptions(false);
-              }}
-            >
-              <Ionicons name="swap-vertical" size={24} color="#333" />
-              <Text style={styles.rowText}>Sorteer alfabetisch</Text>
-            </TouchableOpacity>
-
-            {/* Sorteren op datum (ID-volgorde) */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setTasks((t) =>
-                  [...t].sort((a, b) => Number(a.id) - Number(b.id))
-                );
-                setShowOptions(false);
-              }}
-            >
-              <Ionicons name="calendar" size={24} color="#333" />
-              <Text style={styles.rowText}>Sorteer op datum</Text>
-            </TouchableOpacity>
-
-            {/* Kopie verzenden (ShareModal) */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setShowOptions(false);
-                setShowShare(true);
-              }}
-            >
-              <Ionicons name="share-social-outline" size={24} color="#333" />
-              <Text style={styles.rowText}>Kopie verzenden</Text>
-            </TouchableOpacity>
-
-            {/* Lijst afdrukken (expo-print) */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={async () => {
-                setShowOptions(false);
-                await handlePrint();
-              }}
-            >
-              <Ionicons name="print-outline" size={24} color="#333" />
-              <Text style={styles.rowText}>Lijst afdrukken</Text>
-            </TouchableOpacity>
-          </View>
+          <OptionsSheet
+            style={styles.sheet}
+            onClose={() => setShowOptions(false)}
+            onSortAlphabetical={() => {
+              setTasks((t) => [...t].sort((a, b) => a.title.localeCompare(b.title)));
+              setShowOptions(false);
+            }}
+            onSortByDate={() => {
+              setTasks((t) => [...t].sort((a, b) => Number(a.id) - Number(b.id)));
+              setShowOptions(false);
+            }}
+            onCopy={() => {
+              setShowOptions(false);
+              setShowShare(true);
+            }}
+            onPrint={async () => {
+              setShowOptions(false);
+              await handlePrint();
+            }}
+          />
         </View>
       </Modal>
 
@@ -496,16 +420,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     maxHeight: "50%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
   },
   datePickerContainer: {
     alignItems: "center",
