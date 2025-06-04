@@ -14,24 +14,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import BottomBar from "../components/BottomBar";
-import MenuItem from "../components/MenuItem";
 import Header from "../components/Header";
 import { useFocusEffect } from "@react-navigation/native";
 import { ListsContext, ListItem } from "../context/ListsContext";
+import { baseMenu } from "../utils/menuDefaults";
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const baseMenu: ListItem[] = [
-  { key: "mijnDag", icon: "person", label: "Mijn dag", count: null },
-  { key: "belangrijk", icon: "star-outline", label: "Belangrijk", count: null },
-  {
-    key: "gepland",
-    icon: "event-available",
-    label: "Gepland",
-    count: null,
-  },
-  { key: "taken", icon: "check-circle-outline", label: "Taken", count: null },
-];
 
 export default function HomeScreen() {
   const router = useRouter();

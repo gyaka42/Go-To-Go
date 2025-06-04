@@ -12,13 +12,8 @@ import {
 import { ListsContext } from "../context/ListsContext";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const baseMenu = [
-  { key: "mijnDag", icon: "weather-sunny", label: "Mijn dag" },
-  { key: "belangrijk", icon: "star-outline", label: "Belangrijk" },
-  { key: "gepland", icon: "calendar-blank-outline", label: "Gepland" },
-  { key: "taken", icon: "check-circle-outline", label: "Taken" },
-];
+import { baseMenu } from "../utils/menuDefaults";
+import FilterBar from "../components/FilterBar";
 
 interface SearchResult {
   id: string;
@@ -86,57 +81,7 @@ export default function SearchScreen() {
         autoCorrect={false}
         autoCapitalize="none"
       />
-      {/* Filter knoppenrij */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            filterMode === "all" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilterMode("all")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filterMode === "all" && styles.filterTextActive,
-            ]}
-          >
-            Alles
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            filterMode === "open" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilterMode("open")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filterMode === "open" && styles.filterTextActive,
-            ]}
-          >
-            Open
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            filterMode === "done" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilterMode("done")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filterMode === "done" && styles.filterTextActive,
-            ]}
-          >
-            Voltooid
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <FilterBar mode={filterMode} onChange={setFilterMode} />
 
       <FlatList
         data={filteredResults}
@@ -168,28 +113,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     margin: 16,
-  },
-  filterRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  filterButtonActive: {
-    backgroundColor: "#3B82F6",
-  },
-  filterText: {
-    fontSize: 14,
-    color: "#333",
-  },
-  filterTextActive: {
-    color: "#FFF",
-    fontWeight: "600",
   },
   row: {
     paddingHorizontal: 16,

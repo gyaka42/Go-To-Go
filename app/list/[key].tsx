@@ -20,9 +20,11 @@ import { ListsContext, Task } from "../../context/ListsContext";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import ShareModal from "../new-list/share";
-import OptionsModal from "../new-list/options";
 import * as Print from "expo-print";
-import * as Notifications from "expo-notifications";
+import useTasks from "../../hooks/useTasks";
+import FilterBar from "../../components/FilterBar";
+import OptionsSheet from "../../components/OptionsSheet";
+import { baseMenu } from "../../utils/menuDefaults";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
@@ -38,13 +40,6 @@ export default function ListDetail() {
 
   const isCustom = lists.some((l) => l.key === listKey);
 
-  // Metadata for standard lists
-  const baseMenu = [
-    { key: "mijnDag", label: "Mijn dag" },
-    { key: "belangrijk", label: "Belangrijk" },
-    { key: "gepland", label: "Gepland" },
-    { key: "taken", label: "Taken" },
-  ];
 
   // Determine display label: custom if exists, otherwise standard, otherwise fallback "Lijst"
   const listLabel =
@@ -122,55 +117,12 @@ export default function ListDetail() {
     );
   }, [tasks]);
 
-  // --- SCHEDULE LOCAL NOTIFICATIONS ---
-  async function scheduleReminder(title: string, date: Date) {
-    const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
-    if (seconds <= 0) return;
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: "Taakherinnering",
-          body: title,
-          sound: "default",
-        },
-        trigger: {
-          type: "timeInterval" as any,
-          seconds,
-          repeats: false,
-        },
-      });
-    } catch (err) {
-      console.error("Kon herinnering niet plannen:", err);
-    }
-  }
+  const { addTask: addTaskOp, toggleTask, deleteTask } = useTasks(tasks, setTasks);
 
-  // --- ADD TASK MET OPCIONELE DUE DATE ---
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    const task: Task = {
-      id: Date.now().toString(),
-      title: newTask.trim(),
-      done: false,
-      dueDate: dueDate || null,
-    };
-    setTasks((prev) => [...prev, task]);
+  const addTask = async () => {
+    await addTaskOp(newTask, dueDate);
     setNewTask("");
-    if (dueDate) {
-      scheduleReminder(task.title, dueDate);
-      setDueDate(null);
-    }
-  };
-
-  // --- TOGGLE DONE ---
-  const toggleTask = (id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-  };
-
-  // --- DELETE TASK ---
-  const deleteTask = (id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    if (dueDate) setDueDate(null);
   };
 
   // --- COMMIT TASK EDIT ---
@@ -419,57 +371,11 @@ export default function ListDetail() {
         </View>
       )}
 
-      {/* --- HIER KOMT DE NIEUWE FILTER‐TOGGLE ----------------- */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            filterMode === "all" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilterMode("all")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filterMode === "all" && styles.filterTextActive,
-            ]}
-          >
-            Alles
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            filterMode === "open" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilterMode("open")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filterMode === "open" && styles.filterTextActive,
-            ]}
-          >
-            Open
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.filterButton,
-            filterMode === "done" && styles.filterButtonActive,
-          ]}
-          onPress={() => setFilterMode("done")}
-        >
-          <Text
-            style={[
-              styles.filterText,
-              filterMode === "done" && styles.filterTextActive,
-            ]}
-          >
-            Voltooid
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <FilterBar
+        mode={filterMode}
+        onChange={setFilterMode}
+        style={styles.filterRow}
+      />
       {/* ------------------------------------------------------- */}
 
       {/* Takenlijst: gebruik nu filteredTasks i.p.v. tasks */}
@@ -480,7 +386,6 @@ export default function ListDetail() {
         renderItem={renderTask}
       />
 
-      {/* Opties-modal */}
       <Modal
         visible={showOptions}
         transparent
@@ -492,57 +397,26 @@ export default function ListDetail() {
             style={StyleSheet.absoluteFill}
             onPress={() => setShowOptions(false)}
           />
-          <View style={styles.sheet}>
-            <Text style={styles.modalTitle}>Opties</Text>
-            {/* Sorteer alfabetisch */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setTasks((t) =>
-                  [...t].sort((a, b) => a.title.localeCompare(b.title))
-                );
-                setShowOptions(false);
-              }}
-            >
-              <Ionicons name="swap-vertical" size={24} color="#333" />
-              <Text style={styles.rowText}>Sorteer alfabetisch</Text>
-            </TouchableOpacity>
-            {/* Sorteer op datum */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setTasks((t) =>
-                  [...t].sort((a, b) => Number(a.id) - Number(b.id))
-                );
-                setShowOptions(false);
-              }}
-            >
-              <Ionicons name="calendar" size={24} color="#333" />
-              <Text style={styles.rowText}>Sorteer op datum</Text>
-            </TouchableOpacity>
-            {/* Kopie verzenden */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => {
-                setShowOptions(false);
-                setShowShare(true);
-              }}
-            >
-              <Ionicons name="share-social-outline" size={24} color="#333" />
-              <Text style={styles.rowText}>Kopie verzenden</Text>
-            </TouchableOpacity>
-            {/* Lijst afdrukken */}
-            <TouchableOpacity
-              style={styles.row}
-              onPress={async () => {
-                setShowOptions(false);
-                await handlePrint();
-              }}
-            >
-              <Ionicons name="print-outline" size={24} color="#333" />
-              <Text style={styles.rowText}>Lijst afdrukken</Text>
-            </TouchableOpacity>
-          </View>
+          <OptionsSheet
+            style={styles.sheet}
+            onClose={() => setShowOptions(false)}
+            onSortAlphabetical={() => {
+              setTasks((t) => [...t].sort((a, b) => a.title.localeCompare(b.title)));
+              setShowOptions(false);
+            }}
+            onSortByDate={() => {
+              setTasks((t) => [...t].sort((a, b) => Number(a.id) - Number(b.id)));
+              setShowOptions(false);
+            }}
+            onCopy={() => {
+              setShowOptions(false);
+              setShowShare(true);
+            }}
+            onPrint={async () => {
+              setShowOptions(false);
+              await handlePrint();
+            }}
+          />
         </View>
       </Modal>
 
@@ -658,23 +532,6 @@ const styles = StyleSheet.create({
     // Android elevation
     elevation: 1,
   },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  filterButtonActive: {
-    backgroundColor: "#3B82F6",
-    borderRadius: 6,
-  },
-  filterText: {
-    fontSize: 14,
-    color: "#333",
-  },
-  filterTextActive: {
-    color: "#FFF",
-    fontWeight: "600",
-  },
   taskCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -715,15 +572,5 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
     padding: 16,
     maxHeight: "50%",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
   },
 });
