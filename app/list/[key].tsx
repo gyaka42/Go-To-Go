@@ -40,7 +40,6 @@ export default function ListDetail() {
 
   const isCustom = lists.some((l) => l.key === listKey);
 
-
   // Determine display label: custom if exists, otherwise standard, otherwise fallback "Lijst"
   const listLabel =
     lists.find((l) => l.key === listKey)?.label ||
@@ -117,12 +116,17 @@ export default function ListDetail() {
     );
   }, [tasks]);
 
-  const { addTask: addTaskOp, toggleTask, deleteTask } = useTasks(tasks, setTasks);
+  const {
+    addTask: addTaskOp,
+    toggleTask,
+    deleteTask,
+  } = useTasks(tasks, setTasks);
 
   const addTask = async () => {
     await addTaskOp(newTask, dueDate);
     setNewTask("");
     if (dueDate) setDueDate(null);
+    setShowDatePicker(false);
   };
 
   // --- COMMIT TASK EDIT ---
@@ -401,11 +405,15 @@ export default function ListDetail() {
             style={styles.sheet}
             onClose={() => setShowOptions(false)}
             onSortAlphabetical={() => {
-              setTasks((t) => [...t].sort((a, b) => a.title.localeCompare(b.title)));
+              setTasks((t) =>
+                [...t].sort((a, b) => a.title.localeCompare(b.title))
+              );
               setShowOptions(false);
             }}
             onSortByDate={() => {
-              setTasks((t) => [...t].sort((a, b) => Number(a.id) - Number(b.id)));
+              setTasks((t) =>
+                [...t].sort((a, b) => Number(a.id) - Number(b.id))
+              );
               setShowOptions(false);
             }}
             onCopy={() => {

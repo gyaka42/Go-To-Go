@@ -76,12 +76,19 @@ export default function NewListScreen() {
     });
   }, [navigation, setLists, setTasksMap, title, tasks]);
 
-  const { addTask: addTaskOp, toggleTask, deleteTask } = useTasks(tasks, setTasks);
+  const {
+    addTask: addTaskOp,
+    toggleTask,
+    deleteTask,
+  } = useTasks(tasks, setTasks);
 
   const addTask = async () => {
     await addTaskOp(newTask, dueDate);
     setNewTask("");
-    if (dueDate) setDueDate(null);
+    if (dueDate) {
+      setDueDate(null);
+      setShowDatePicker(false);
+    }
   };
 
   const commitEdit = (id: string) => {
@@ -292,11 +299,15 @@ export default function NewListScreen() {
             style={styles.sheet}
             onClose={() => setShowOptions(false)}
             onSortAlphabetical={() => {
-              setTasks((t) => [...t].sort((a, b) => a.title.localeCompare(b.title)));
+              setTasks((t) =>
+                [...t].sort((a, b) => a.title.localeCompare(b.title))
+              );
               setShowOptions(false);
             }}
             onSortByDate={() => {
-              setTasks((t) => [...t].sort((a, b) => Number(a.id) - Number(b.id)));
+              setTasks((t) =>
+                [...t].sort((a, b) => Number(a.id) - Number(b.id))
+              );
               setShowOptions(false);
             }}
             onCopy={() => {
