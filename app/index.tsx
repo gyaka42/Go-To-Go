@@ -1,30 +1,32 @@
 // app/index.tsx
 import React, { useState, useEffect, useContext, useCallback } from "react";
+import * as Notifications from "expo-notifications";
 import {
   ActivityIndicator,
-  FlatList,
   View,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
-  Platform,
+  useColorScheme,
 } from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import BottomBar from "../components/BottomBar";
 import Header from "../components/Header";
 import { useFocusEffect } from "@react-navigation/native";
-import { ListsContext, ListItem } from "../context/ListsContext";
+import { ListsContext, ListItem, Task } from "../context/ListsContext";
 import { baseMenu } from "../utils/menuDefaults";
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-
 export default function HomeScreen() {
   const router = useRouter();
-  const { lists, setLists, tasksMap } = useContext(ListsContext);
+  const { lists, setLists, tasksMap, setTasksMap } = useContext(ListsContext);
+  const scheme = useColorScheme(); // 'light' or 'dark'
 
   // 1️⃣ Hooks die we altijd willen aanroepen – óók voordat we weten of we isReady zijn:
   const [isReady, setIsReady] = useState(false);
@@ -32,6 +34,12 @@ export default function HomeScreen() {
 
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [order, setOrder] = useState<string[]>([]);
+  useEffect(() => {
+    AsyncStorage.getItem("list_order").then((json) => {
+      if (json) setOrder(JSON.parse(json));
+    });
+  }, []);
 
   // 2️⃣ Effect: eerst controleren of er een “user_name” in AsyncStorage staat
   useEffect(() => {
@@ -59,19 +67,6 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // 4️⃣ Effect: permissie voor fotobibliotheek vragen
-  useEffect(() => {
-    (async () => {
-      const { status } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== "granted") {
-        alert(
-          "Toestemming voor foto's is nodig om de avatar te kunnen wijzigen."
-        );
-      }
-    })();
-  }, []);
-
   // 5️⃣ useFocusEffect: badge‐counts telkens als lijsten veranderen
   useFocusEffect(
     useCallback(() => {
@@ -91,7 +86,20 @@ export default function HomeScreen() {
 
   // 6️⃣ Hook voor verwijderen van een custom lijstje
   const deleteList = (key: string) => {
+    // Cancel any scheduled notifications for tasks in this list
+    const tasksInList: Task[] = tasksMap[key] || [];
+    tasksInList.forEach((t) => {
+      if (t.notificationId) {
+        Notifications.cancelScheduledNotificationAsync(t.notificationId);
+      }
+    });
+    // Remove the list and its tasks
     setLists((prev) => prev.filter((l) => l.key !== key));
+    setTasksMap((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
   };
 
   // 7️⃣ Bereken welke items getoond worden op de home‐pagina
@@ -106,6 +114,12 @@ export default function HomeScreen() {
     };
   });
 
+  // Apply saved order, then append any new items
+  const orderedCombined = [
+    ...order.map((key) => combined.find((i) => i.key === key)).filter(Boolean),
+    ...combined.filter((i) => !order.includes(i.key)),
+  ];
+
   // ──────────────────────────────────────────────────────
   // 8️⃣ Pas na alle “unconditional hooks”
   //     doen we de early return voor de loader:
@@ -119,7 +133,13 @@ export default function HomeScreen() {
 
   // 9️⃣ Eindelijk, zodra isReady === true, renderen we de Home‐UI:
   return (
-    <SafeAreaView edges={["left", "right", "bottom"]} style={styles.container}>
+    <SafeAreaView
+      edges={["left", "right", "bottom"]}
+      style={[
+        styles.container,
+        { backgroundColor: scheme === "dark" ? "#000" : "#F3F4F6" },
+      ]}
+    >
       {/* Header met avatar en gebruikersnaam */}
       <Header
         username={userName || "Gebruiker"}
@@ -147,44 +167,74 @@ export default function HomeScreen() {
       />
 
       {/* Welkomsttekst onder header */}
-      <View style={styles.welcomeContainer}>
-        <Text style={styles.welcomeText}>
+      <View
+        style={[
+          styles.welcomeContainer,
+          { backgroundColor: scheme === "dark" ? "#222" : "#FFF" },
+        ]}
+      >
+        <Text
+          style={[
+            styles.welcomeText,
+            { color: scheme === "dark" ? "#FFF" : "#111827" },
+          ]}
+        >
           Welkom terug{userName ? `, ${userName}` : ""}!
         </Text>
-        <Text style={styles.subtitleText}>
+        <Text
+          style={[
+            styles.subtitleText,
+            { color: scheme === "dark" ? "#CCC" : "#6B7280" },
+          ]}
+        >
           Hier zijn je to-do’s voor vandaag:
         </Text>
       </View>
 
-      {/* FlatList met alle kaarten */}
-      <FlatList
-        data={combined}
+      {/* DraggableFlatList met alle kaarten */}
+      <DraggableFlatList
+        data={orderedCombined}
         keyExtractor={(item) => item.key}
-        contentContainerStyle={{ paddingBottom: 100 }}
-        renderItem={({ item }) => {
+        onDragEnd={({ data }) => {
+          const newOrder = data.map((i) => i.key);
+          setOrder(newOrder);
+          AsyncStorage.setItem("list_order", JSON.stringify(newOrder));
+        }}
+        renderItem={({ item, drag, isActive }: RenderItemParams<ListItem>) => {
           const isCustom = lists.some((l) => l.key === item.key);
           return (
-            <View style={styles.card}>
-              <TouchableOpacity
-                style={styles.cardContent}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/list/${item.key}`)}
-              >
+            <TouchableOpacity
+              style={[
+                styles.card,
+                isActive && { opacity: 0.8 },
+                { backgroundColor: scheme === "dark" ? "#333" : "#FFF" },
+              ]}
+              onLongPress={drag}
+              activeOpacity={0.8}
+              onPress={() => router.push(`/list/${item.key}`)}
+            >
+              <View style={styles.cardContent}>
                 <MaterialIcons
                   name={item.icon as any}
                   size={28}
                   color="#3B82F6"
                   style={styles.cardIcon}
                 />
-                <Text style={styles.cardLabel}>{item.label}</Text>
+                <Text
+                  style={[
+                    styles.cardLabel,
+                    { color: scheme === "dark" ? "#FFF" : "#111827" },
+                  ]}
+                >
+                  {item.label}
+                </Text>
                 <View style={styles.spacer} />
                 {item.count != null && (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>{item.count}</Text>
                   </View>
                 )}
-              </TouchableOpacity>
-
+              </View>
               {isCustom && (
                 <TouchableOpacity
                   onPress={() => deleteList(item.key)}
@@ -193,9 +243,10 @@ export default function HomeScreen() {
                   <MaterialIcons name="delete" size={24} color="#EF4444" />
                 </TouchableOpacity>
               )}
-            </View>
+            </TouchableOpacity>
           );
         }}
+        contentContainerStyle={{ paddingBottom: 100 }}
       />
 
       {/* Onderbalk met “Nieuwe lijst” knop */}

@@ -1,17 +1,32 @@
 import React from "react";
-import { View, TouchableOpacity, Text, StyleSheet, ViewStyle } from "react-native";
+import {
+  View,
+  TouchableOpacity,
+  Text,
+  StyleSheet,
+  ViewStyle,
+  useColorScheme,
+  StyleProp,
+} from "react-native";
 
 type Mode = "all" | "open" | "done";
 
 interface Props {
   mode: Mode;
   onChange: (m: Mode) => void;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export default function FilterBar({ mode, onChange, style }: Props) {
+  const scheme = useColorScheme();
   return (
-    <View style={[styles.row, style]}>
+    <View
+      style={[
+        styles.row,
+        { backgroundColor: scheme === "dark" ? "#1F2937" : "#FFF" },
+        style,
+      ]}
+    >
       {[
         { key: "all", label: "Alles" },
         { key: "open", label: "Open" },
@@ -19,10 +34,21 @@ export default function FilterBar({ mode, onChange, style }: Props) {
       ].map((f) => (
         <TouchableOpacity
           key={f.key}
-          style={[styles.button, mode === f.key && styles.buttonActive]}
+          style={[
+            styles.button,
+            mode === f.key && {
+              backgroundColor: scheme === "dark" ? "#2563EB" : "#3B82F6",
+            },
+          ]}
           onPress={() => onChange(f.key as Mode)}
         >
-          <Text style={[styles.text, mode === f.key && styles.textActive]}>
+          <Text
+            style={[
+              styles.text,
+              { color: scheme === "dark" ? "#D1D5DB" : "#333" },
+              mode === f.key && { color: "#FFF", fontWeight: "600" },
+            ]}
+          >
             {f.label}
           </Text>
         </TouchableOpacity>
@@ -35,8 +61,10 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-around",
+    alignItems: "center",
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingVertical: 8,
+    borderRadius: 6,
   },
   button: {
     paddingHorizontal: 12,

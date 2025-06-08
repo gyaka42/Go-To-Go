@@ -37,6 +37,14 @@ interface ListsProviderProps {
   children: ReactNode;
 }
 
+export interface Task {
+  id: string;
+  title: string;
+  done: boolean;
+  dueDate: Date | null;
+  notificationId?: string;
+}
+
 export function ListsProvider({ children }: ListsProviderProps) {
   const [lists, setLists] = useState<ListItem[]>([]);
   const [tasksMap, setTasksMap] = useState<Record<string, Task[]>>({});

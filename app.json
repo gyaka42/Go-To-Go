@@ -1,32 +1,71 @@
 {
   "expo": {
-    "name": "todos-app",
+    "name": "Go-To-Go",
     "slug": "todos-app",
-    "version": "1.0.0",
+    "assetBundlePatterns": ["assets/**/*"],
+    "version": "1.0.11",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "scheme": "your-app-scheme",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ff8d9e"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.gogo22.todosapp",
+      "buildNumber": "20",
+      "icon": {
+        "dark": "./assets/dark-icon.png",
+        "light": "./assets/icon.png",
+        "tinted": "./assets/tinted-icon.png"
+      },
+      "infoPlist": {
+        "CFBundleDisplayName": "Go-To-Go",
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "We hebben toegang tot je fotobibliotheek nodig om een avatar te kiezen.",
+        "NSCameraUsageDescription": "We hebben toegang tot je camera nodig om een foto te maken voor je avatar."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.gogo22.todosapp",
+      "versionCode": 20
+    },
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#2563EB"
     },
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-router"]
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ff8d9e"
+        }
+      ],
+      "expo-notifications"
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f766b849-a03e-41b4-868e-184c7bcb6273"
+      }
+    }
   }
 }

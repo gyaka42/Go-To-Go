@@ -7,9 +7,9 @@ import {
   StyleSheet,
   Linking,
   Alert,
-  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useColorScheme } from "react-native";
 
 interface Props {
   listTitle: string;
@@ -18,6 +18,9 @@ interface Props {
 }
 
 const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
+  const scheme = useColorScheme();
+  const iconColor = scheme === "dark" ? "#FFF" : "#000";
+  const styles = getStyles(scheme);
   const [email, setEmail] = useState("");
 
   const sendInvite = async () => {
@@ -52,61 +55,81 @@ const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
 
   return (
     <View style={styles.container}>
-      <SafeAreaView>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Lijst delen: {listTitle}</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#111" />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.content}>
-          <TextInput
-            placeholder="E-mailadres"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            style={styles.input}
-          />
-          <TouchableOpacity
-            style={[styles.button, !email.trim() && { opacity: 0.5 }]}
-            onPress={sendInvite}
-            disabled={!email.trim()}
-          >
-            <Text style={styles.buttonText}>Verstuur uitnodiging</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Lijst delen: {listTitle}</Text>
+        <TouchableOpacity onPress={onClose}>
+          <Ionicons name="close" size={24} color={iconColor} />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.content}>
+        <TextInput
+          placeholder="E-mailadres"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          style={styles.input}
+        />
+        <TouchableOpacity
+          style={[styles.button, !email.trim() && { opacity: 0.5 }]}
+          onPress={sendInvite}
+          disabled={!email.trim()}
+        >
+          <Text style={styles.buttonText}>Verstuur uitnodiging</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 export default ShareModal;
 
-const styles = StyleSheet.create({
-  container: { backgroundColor: "#FFF" },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  headerTitle: { fontSize: 18, fontWeight: "600", color: "#111" },
-  content: { padding: 20 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  button: {
-    backgroundColor: "#2563EB",
-    padding: 12,
-    borderRadius: 6,
-    alignItems: "center",
-  },
-  buttonText: { color: "#FFF", fontWeight: "600" },
-});
+const getStyles = (scheme: "light" | "dark" | null) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: scheme === "dark" ? "#000" : "#FFF",
+      paddingTop: 16,
+      paddingBottom: 16,
+      paddingHorizontal: 16,
+      margin: -16,
+      borderTopLeftRadius: 12,
+      borderTopRightRadius: 12,
+      borderColor: scheme === "dark" ? "#000" : "#FFF",
+      borderWidth: 1,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 16,
+      borderBottomWidth: 1,
+      borderColor: scheme === "dark" ? "#333" : "#E5E7EB",
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: scheme === "dark" ? "#FFF" : "#111",
+    },
+    content: {
+      padding: 20,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: scheme === "dark" ? "#555" : "#E5E7EB",
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+      color: scheme === "dark" ? "#FFF" : "#000",
+      backgroundColor: scheme === "dark" ? "#222" : "#FFF",
+    },
+    button: {
+      backgroundColor: "#2563EB",
+      padding: 12,
+      borderRadius: 6,
+      alignItems: "center",
+    },
+    buttonText: {
+      color: "#FFF",
+      fontWeight: "600",
+    },
+  });

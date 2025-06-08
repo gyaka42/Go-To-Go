@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { useColorScheme, ColorSchemeName } from "react-native";
 import { ListsContext } from "../context/ListsContext";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -30,6 +31,9 @@ export default function SearchScreen() {
   // toegevoegde filterMode state
   const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
   const router = useRouter();
+
+  const colorScheme = useColorScheme();
+  const styles = getStyles(colorScheme);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -81,7 +85,11 @@ export default function SearchScreen() {
         autoCorrect={false}
         autoCapitalize="none"
       />
-      <FilterBar mode={filterMode} onChange={setFilterMode} />
+      <FilterBar
+        mode={filterMode}
+        onChange={setFilterMode}
+        style={styles.filterBar}
+      />
 
       <FlatList
         data={filteredResults}
@@ -105,22 +113,36 @@ export default function SearchScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFF" },
-  input: {
-    borderWidth: 1,
-    borderColor: "#DDD",
-    borderRadius: 8,
-    padding: 12,
-    margin: 16,
-  },
-  row: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderColor: "#EEE",
-  },
-  title: { fontSize: 16, color: "#111" },
-  sub: { fontSize: 12, color: "#666" },
-  empty: { textAlign: "center", marginTop: 32, color: "#666" },
-});
+function getStyles(scheme: ColorSchemeName) {
+  const isDark = scheme === "dark";
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: isDark ? "#000" : "#FFF" },
+    input: {
+      borderWidth: 1,
+      borderColor: isDark ? "#555" : "#DDD",
+      borderRadius: 8,
+      padding: 12,
+      margin: 16,
+      color: isDark ? "#FFF" : "#000",
+    },
+    filterBar: {
+      marginHorizontal: 16,
+      marginBottom: 12,
+      alignItems: "center",
+      paddingVertical: 4,
+    },
+    row: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderColor: isDark ? "#333" : "#EEE",
+    },
+    title: { fontSize: 16, color: isDark ? "#FFF" : "#111" },
+    sub: { fontSize: 12, color: isDark ? "#AAA" : "#666" },
+    empty: {
+      textAlign: "center",
+      marginTop: 32,
+      color: isDark ? "#AAA" : "#666",
+    },
+  });
+}

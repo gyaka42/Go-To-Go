@@ -1,6 +1,7 @@
 // app/list/[key].tsx
 
 import React, { useState, useEffect, useContext, useLayoutEffect } from "react";
+import * as Notifications from "expo-notifications";
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
   Platform,
   StyleSheet,
   Keyboard,
+  useColorScheme,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ListsContext, Task } from "../../context/ListsContext";
@@ -21,6 +23,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import ShareModal from "../new-list/share";
 import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
 import useTasks from "../../hooks/useTasks";
 import FilterBar from "../../components/FilterBar";
 import OptionsSheet from "../../components/OptionsSheet";
@@ -31,6 +34,21 @@ import DateTimePicker, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function ListDetail() {
+  const scheme = useColorScheme();
+  const theme =
+    scheme === "dark"
+      ? {
+          background: "#121212",
+          cardBackground: "#1E1E1E",
+          text: "#FFFFFF",
+          secondaryText: "#9CA3AF",
+        }
+      : {
+          background: "#F3F4F6",
+          cardBackground: "#FFFFFF",
+          text: "#111827",
+          secondaryText: "#6B7280",
+        };
   // --- ROUTER & CONTEXT ---
   const { key } = useLocalSearchParams();
   const listKey = Array.isArray(key) ? key[0] : key;
@@ -59,6 +77,10 @@ export default function ListDetail() {
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
 
+  // State to track which task's date picker is open
+  const [datePickerFor, setDatePickerFor] = useState<string | null>(null);
+  const [showInputDatePicker, setShowInputDatePicker] = useState(false);
+
   // --- NYE STATE: FILTER MODE ---
   // "all" = alle taken, "open" = alleen open, "done" = alleen voltooide
   const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
@@ -86,14 +108,16 @@ export default function ListDetail() {
     } else {
       AsyncStorage.getItem(`todos_${listKey}`)
         .then((json) => {
-          const savedTasks: (Task & { dueDate: string | null })[] = json
-            ? JSON.parse(json)
-            : [];
+          const savedTasks: (Task & {
+            dueDate: string | null;
+            notificationId?: string;
+          })[] = json ? JSON.parse(json) : [];
           const parsedList: Task[] = savedTasks.map((t) => ({
             id: t.id,
             title: t.title,
             done: t.done,
             dueDate: t.dueDate ? new Date(t.dueDate) : null,
+            notificationId: t.notificationId,
           }));
           setTasks(parsedList);
         })
@@ -117,16 +141,18 @@ export default function ListDetail() {
   }, [tasks]);
 
   const {
-    addTask: addTaskOp,
+    addTask: hookAddTask,
     toggleTask,
     deleteTask,
-  } = useTasks(tasks, setTasks);
+  } = useTasks(tasks, setTasks, listKey);
 
   const addTask = async () => {
-    await addTaskOp(newTask, dueDate);
+    await hookAddTask(newTask, dueDate, listKey);
     setNewTask("");
-    if (dueDate) setDueDate(null);
+    setDueDate(null);
     setShowDatePicker(false);
+    setDatePickerFor(null);
+    setShowInputDatePicker(false);
   };
 
   // --- COMMIT TASK EDIT ---
@@ -162,11 +188,25 @@ export default function ListDetail() {
     ];
     const html = htmlLines.join("\n");
     try {
+      // Show native print dialog
       await Print.printAsync({ html });
-    } catch (err: any) {
-      const msg = err?.message ?? "";
-      if (msg.includes("Printing did not complete")) return;
-      console.error("Print-fout:", err);
+    } catch (printError) {
+      const errMsg = printError?.message ?? "";
+      if (errMsg.includes("Printing did not complete")) {
+        // User cancelled the print dialog; do nothing and return to options sheet
+        return;
+      }
+      // Fallback for real errors: generate PDF and open share sheet
+      try {
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, {
+          UTI: ".pdf",
+          mimeType: "application/pdf",
+        });
+      } catch (shareError) {
+        console.error("PDF delen mislukt:", shareError);
+        alert("Kon de lijst niet afdrukken of delen.");
+      }
     }
   };
 
@@ -181,10 +221,18 @@ export default function ListDetail() {
             onPress={() => setShowShare(true)}
             style={{ marginRight: 16 }}
           >
-            <Ionicons name="share-social-outline" size={24} color="#000" />
+            <Ionicons
+              name="share-social-outline"
+              size={24}
+              color={theme.text}
+            />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setShowOptions(true)}>
-            <Ionicons name="ellipsis-vertical-outline" size={24} color="#000" />
+            <Ionicons
+              name="ellipsis-vertical-outline"
+              size={24}
+              color={theme.text}
+            />
           </TouchableOpacity>
         </View>
       ),
@@ -197,6 +245,10 @@ export default function ListDetail() {
       if (editingId === "rename") {
         commitRename();
       }
+      // If the list is being deleted (could add a condition here if you have a flag)
+      // Cancel notifications for all tasks in this list before removing them
+      // (Assuming you add a delete-list action, or if you want to always cancel on unmount)
+      // (notification cancel logic removed)
     });
     return unsubscribe;
   }, [navigation, editingId, commitRename]);
@@ -211,7 +263,7 @@ export default function ListDetail() {
 
   // --- RENDEREN VAN ÉÉN TAKENREGEL ---
   const renderTask = ({ item }: { item: Task }) => (
-    <View style={styles.taskCard}>
+    <View style={[styles.taskCard, { backgroundColor: theme.cardBackground }]}>
       <Pressable
         onPress={() => toggleTask(item.id)}
         onLongPress={() => {
@@ -227,7 +279,10 @@ export default function ListDetail() {
             onChangeText={setEditingText}
             onSubmitEditing={() => commitEdit(item.id)}
             onBlur={() => commitEdit(item.id)}
-            style={[styles.rowText, { flex: 1, marginLeft: 8, padding: 0 }]}
+            style={[
+              styles.rowText,
+              { flex: 1, marginLeft: 8, padding: 0, color: theme.text },
+            ]}
             autoFocus
           />
         ) : (
@@ -245,7 +300,8 @@ export default function ListDetail() {
               <Text
                 style={[
                   styles.rowText,
-                  item.done && styles.rowDone,
+                  { color: theme.text },
+                  item.done && { color: theme.secondaryText },
                   { marginLeft: 8 },
                 ]}
               >
@@ -253,37 +309,154 @@ export default function ListDetail() {
               </Text>
             </View>
             {item.dueDate && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: "#6B7280",
-                  marginLeft: 32,
-                  marginTop: 2,
-                }}
-              >
-                {new Date(item.dueDate).toLocaleString(undefined, {
-                  dateStyle: "short",
-                  timeStyle: "short",
-                })}
-              </Text>
+              <>
+                {Platform.OS === "android" ? (
+                  <>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setDatePickerFor(item.id);
+                        DateTimePickerAndroid.open({
+                          value: item.dueDate,
+                          mode: "date",
+                          onChange: (event, selectedDate) => {
+                            setDatePickerFor(null);
+                            if (event.type === "set" && selectedDate) {
+                              // then open time picker
+                              DateTimePickerAndroid.open({
+                                value: selectedDate,
+                                mode: "time",
+                                is24Hour: true,
+                                onChange: (evt2, selectedTime) => {
+                                  if (evt2.type === "set" && selectedTime) {
+                                    const combined = new Date(selectedDate);
+                                    combined.setHours(
+                                      selectedTime.getHours(),
+                                      selectedTime.getMinutes()
+                                    );
+                                    // update the task dueDate
+                                    setTasks((prev) =>
+                                      prev.map((t) =>
+                                        t.id === item.id
+                                          ? { ...t, dueDate: combined }
+                                          : t
+                                      )
+                                    );
+                                  }
+                                },
+                              });
+                            }
+                          },
+                        });
+                      }}
+                      style={{ marginLeft: 32, marginTop: 2 }}
+                    >
+                      <Text
+                        style={{ fontSize: 12, color: theme.secondaryText }}
+                      >
+                        {new Date(item.dueDate).toLocaleString(undefined, {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  // iOS inline picker
+                  <>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowInputDatePicker(false);
+                        setDatePickerFor(item.id);
+                      }}
+                      style={{ marginLeft: 32, marginTop: 2 }}
+                    >
+                      <Text
+                        style={{ fontSize: 12, color: theme.secondaryText }}
+                      >
+                        {new Date(item.dueDate).toLocaleString(undefined, {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })}
+                      </Text>
+                    </TouchableOpacity>
+                    {datePickerFor === item.id && (
+                      <View style={styles.datePickerWrapper}>
+                        <DateTimePicker
+                          value={item.dueDate!}
+                          mode="datetime"
+                          display="inline"
+                          onChange={async (_, selectedDate) => {
+                            if (selectedDate) {
+                              // cancel old
+                              const old = tasks.find((t) => t.id === item.id);
+                              if (old?.notificationId) {
+                                await Notifications.cancelScheduledNotificationAsync(
+                                  old.notificationId
+                                );
+                              }
+                              // schedule new
+                              const newId =
+                                await Notifications.scheduleNotificationAsync({
+                                  content: {
+                                    title: "Taakherinnering",
+                                    body: item.title,
+                                    data: { listKey },
+                                  },
+                                  trigger: {
+                                    type: "date",
+                                    date: selectedDate,
+                                  } as Notifications.DateTriggerInput,
+                                });
+                              setTasks((prev) =>
+                                prev.map((t) =>
+                                  t.id === item.id
+                                    ? {
+                                        ...t,
+                                        dueDate: selectedDate,
+                                        notificationId: newId,
+                                      }
+                                    : t
+                                )
+                              );
+                            }
+                          }}
+                          style={{ width: "90%" }}
+                        />
+                        <TouchableOpacity
+                          onPress={() => setDatePickerFor(null)}
+                          style={styles.dateDoneButton}
+                        >
+                          <Text style={styles.dateDoneText}>Gereed</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </>
+                )}
+              </>
             )}
           </>
         )}
       </Pressable>
 
-      <TouchableOpacity
-        onPress={() => deleteTask(item.id)}
-        style={{ padding: 16 }}
-      >
-        <Text style={styles.deleteX}>✕</Text>
-      </TouchableOpacity>
+      {datePickerFor !== item.id && (
+        <TouchableOpacity
+          onPress={() => deleteTask(item.id)}
+          style={{ padding: 16 }}
+        >
+          <Text style={styles.deleteX}>✕</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       {/* Bovenste balk: lijstnaam of bewerk-input */}
-      <View style={styles.headerCard}>
+      <View
+        style={[styles.headerCard, { backgroundColor: theme.cardBackground }]}
+      >
         {isCustom ? (
           editingId === "rename" ? (
             <TextInput
@@ -293,7 +466,11 @@ export default function ListDetail() {
               onBlur={commitRename}
               autoFocus
               placeholder="Nieuwe lijstnaam"
-              style={styles.renameInput}
+              placeholderTextColor={theme.secondaryText}
+              style={[
+                styles.renameInput,
+                { backgroundColor: theme.cardBackground, color: theme.text },
+              ]}
             />
           ) : (
             <Pressable
@@ -303,47 +480,29 @@ export default function ListDetail() {
               }}
               style={{ flex: 1 }}
             >
-              <Text style={styles.headerTitle}>{listLabel}</Text>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>
+                {listLabel}
+              </Text>
             </Pressable>
           )
         ) : (
-          <Text style={styles.headerTitle}>{listLabel}</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
+            {listLabel}
+          </Text>
         )}
       </View>
 
       {/* Invoerveld + kalendericoon */}
-      <View style={styles.inputCard}>
+      <View
+        style={[styles.inputCard, { backgroundColor: theme.cardBackground }]}
+      >
         <TouchableOpacity
           style={{ marginRight: 8 }}
           onPress={() => {
-            Keyboard.dismiss();
-            if (Platform.OS === "android") {
-              DateTimePickerAndroid.open({
-                value: dueDate || new Date(),
-                mode: "date",
-                onChange: (event, selectedDate) => {
-                  if (event.type === "set" && selectedDate) {
-                    DateTimePickerAndroid.open({
-                      value: selectedDate,
-                      mode: "time",
-                      is24Hour: true,
-                      onChange: (evt2, selectedTime) => {
-                        if (evt2.type === "set" && selectedTime) {
-                          const combined = new Date(selectedDate);
-                          combined.setHours(
-                            selectedTime.getHours(),
-                            selectedTime.getMinutes()
-                          );
-                          setDueDate(combined);
-                        }
-                      },
-                    });
-                  }
-                },
-              });
-            } else {
-              setShowDatePicker((prev) => !prev);
-            }
+            // close any task pickers
+            setDatePickerFor(null);
+            // toggle the input date picker
+            setShowInputDatePicker((prev) => !prev);
           }}
         >
           <Ionicons name="calendar-outline" size={24} color="#2563EB" />
@@ -353,7 +512,11 @@ export default function ListDetail() {
           onChangeText={setNewTask}
           onFocus={() => setShowDatePicker(false)}
           placeholder="Nieuwe taak"
-          style={styles.input}
+          placeholderTextColor={theme.secondaryText}
+          style={[
+            styles.input,
+            { backgroundColor: theme.cardBackground, color: theme.text },
+          ]}
         />
         <TouchableOpacity onPress={addTask} style={styles.addBtn}>
           <Ionicons name="add-circle-outline" size={28} color="#2563EB" />
@@ -361,8 +524,8 @@ export default function ListDetail() {
       </View>
 
       {/* Inline DateTimePicker alleen op iOS */}
-      {Platform.OS === "ios" && showDatePicker && (
-        <View style={{ alignItems: "center", marginVertical: 8 }}>
+      {Platform.OS === "ios" && showInputDatePicker && (
+        <View style={styles.datePickerWrapper}>
           <DateTimePicker
             value={dueDate || new Date()}
             mode="datetime"
@@ -372,13 +535,19 @@ export default function ListDetail() {
             }}
             style={{ width: "90%" }}
           />
+          <TouchableOpacity
+            onPress={() => setShowInputDatePicker(false)}
+            style={styles.dateDoneButton}
+          >
+            <Text style={styles.dateDoneText}>Gereed</Text>
+          </TouchableOpacity>
         </View>
       )}
 
       <FilterBar
         mode={filterMode}
         onChange={setFilterMode}
-        style={styles.filterRow}
+        style={[styles.filterRow, { backgroundColor: theme.cardBackground }]}
       />
       {/* ------------------------------------------------------- */}
 
@@ -420,9 +589,12 @@ export default function ListDetail() {
               setShowOptions(false);
               setShowShare(true);
             }}
-            onPrint={async () => {
+            onPrint={() => {
               setShowOptions(false);
-              await handlePrint();
+              // Delay until modal is fully dismissed, then show print dialog
+              setTimeout(() => {
+                handlePrint();
+              }, 500);
             }}
           />
         </View>
@@ -518,7 +690,7 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     borderRadius: 8,
     padding: 8,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "transparent",
   },
   addBtn: {
     marginLeft: 8,
@@ -580,5 +752,22 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 12,
     padding: 16,
     maxHeight: "50%",
+  },
+  datePickerWrapper: {
+    alignItems: "center",
+    marginTop: 0,
+    marginBottom: 8,
+  },
+  dateDoneButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: "#2563EB",
+  },
+  dateDoneText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

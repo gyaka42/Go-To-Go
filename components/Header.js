@@ -1,5 +1,11 @@
 import React from "react";
-import { View, Text, Image, TouchableOpacity } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  TouchableOpacity,
+  useColorScheme,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function Header({
@@ -8,13 +14,16 @@ export default function Header({
   onSearch,
   onAvatarPress,
 }) {
+  const scheme = useColorScheme();
+  const isDark = scheme === "dark";
+
   return (
     <View
       style={{
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        backgroundColor: "#FFF",
+        backgroundColor: isDark ? "#000" : "#FFF",
         paddingHorizontal: 16,
         paddingVertical: 8,
       }}
@@ -27,12 +36,18 @@ export default function Header({
             style={{ width: 32, height: 32, borderRadius: 16, marginRight: 8 }}
           />
         </TouchableOpacity>
-        <Text style={{ fontSize: 16, fontWeight: "600", color: "#111827" }}>
+        <Text
+          style={{
+            fontSize: 16,
+            fontWeight: "600",
+            color: isDark ? "#FFF" : "#111827",
+          }}
+        >
           {username}
         </Text>
       </View>
       <TouchableOpacity onPress={onSearch} style={{ padding: 8 }}>
-        <Ionicons name="search" size={24} color="#333" />
+        <Ionicons name="search" size={24} color={isDark ? "#FFF" : "#333"} />
       </TouchableOpacity>
     </View>
   );

@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  useColorScheme,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -16,6 +17,20 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export default function Onboarding() {
   const [name, setName] = useState("");
   const router = useRouter();
+
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = {
+    wrapperBg: isDark ? "#1F2937" : "#F9FAFB",
+    titleColor: isDark ? "#F9FAFB" : "#111827",
+    subtitleColor: isDark ? "#D1D5DB" : "#4B5563",
+    inputBg: isDark ? "#374151" : "#FFFFFF",
+    inputBorder: isDark ? "#4B5563" : "#D1D5DB",
+    inputText: isDark ? "#F9FAFB" : "#111827",
+    placeholder: isDark ? "#9CA3AF" : "#888",
+    buttonBg: "#3B82F6",
+    buttonText: "#FFFFFF",
+  };
 
   const saveNameAndContinue = async () => {
     if (name.trim().length === 0) return;
@@ -28,9 +43,11 @@ export default function Onboarding() {
       behavior={Platform.select({ ios: "padding", android: undefined })}
       style={styles.flex}
     >
-      <View style={styles.wrapper}>
+      <View style={[styles.wrapper, { backgroundColor: theme.wrapperBg }]}>
         {/* Korte Titel */}
-        <Text style={styles.title}>Welkom Bij</Text>
+        <Text style={[styles.title, { color: theme.titleColor }]}>
+          Welkom Bij
+        </Text>
 
         {/* Afbeelding met afgeronde hoeken */}
         <Image
@@ -40,15 +57,22 @@ export default function Onboarding() {
         />
 
         {/* Instructietekst */}
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: theme.subtitleColor }]}>
           Vul hieronder je voornaam in om te beginnen
         </Text>
 
         {/* Invoerveld */}
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: theme.inputBg,
+              borderColor: theme.inputBorder,
+              color: theme.inputText,
+            },
+          ]}
           placeholder="Bijv. Gökhan"
-          placeholderTextColor="#888"
+          placeholderTextColor={theme.placeholder}
           value={name}
           onChangeText={setName}
           returnKeyType="done"
@@ -64,7 +88,9 @@ export default function Onboarding() {
           onPress={saveNameAndContinue}
           disabled={name.trim().length === 0}
         >
-          <Text style={styles.buttonText}>Verder</Text>
+          <Text style={[styles.buttonText, { color: theme.buttonText }]}>
+            Verder
+          </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
