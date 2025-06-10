@@ -1,13 +1,14 @@
-import React from "react";
+import React, { useContext } from "react";
+import { useLanguage } from "../context/LanguageContext";
 import {
   View,
   TouchableOpacity,
   Text,
   StyleSheet,
   ViewStyle,
-  useColorScheme,
   StyleProp,
 } from "react-native";
+import { ThemeContext } from "../context/ThemeContext";
 
 type Mode = "all" | "open" | "done";
 
@@ -18,7 +19,9 @@ interface Props {
 }
 
 export default function FilterBar({ mode, onChange, style }: Props) {
-  const scheme = useColorScheme();
+  const { scheme } = useContext(ThemeContext);
+  const { t } = useLanguage();
+
   return (
     <View
       style={[
@@ -28,9 +31,9 @@ export default function FilterBar({ mode, onChange, style }: Props) {
       ]}
     >
       {[
-        { key: "all", label: "Alles" },
-        { key: "open", label: "Open" },
-        { key: "done", label: "Voltooid" },
+        { key: "all", label: t("filterAll") },
+        { key: "open", label: t("filterOpen") },
+        { key: "done", label: t("filterDone") },
       ].map((f) => (
         <TouchableOpacity
           key={f.key}

@@ -1,12 +1,8 @@
-import React from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  useColorScheme,
-} from "react-native";
+import React, { useContext } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { ThemeContext } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 
 interface Props {
   onClose: () => void;
@@ -25,38 +21,41 @@ export default function OptionsSheet({
   onPrint,
   style,
 }: Props) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { scheme } = useContext(ThemeContext);
+
+  const isDark = scheme === "dark";
   const bgColor = isDark ? "#000" : "#FFF";
   const textColor = isDark ? "#FFF" : "#333";
   const iconColor = isDark ? "#FFF" : "#333";
 
+  const { t } = useLanguage();
+
   return (
     <View style={[styles.sheet, style, { backgroundColor: bgColor }]}>
-      <Text style={[styles.modalTitle, { color: textColor }]}>Opties</Text>
+      <Text style={[styles.modalTitle, { color: textColor }]}>
+        {t("options")}
+      </Text>
       <TouchableOpacity style={styles.row} onPress={onSortAlphabetical}>
         <Ionicons name="swap-vertical" size={24} color={iconColor} />
         <Text style={[styles.rowText, { color: textColor }]}>
-          Sorteer alfabetisch
+          {t("sortAlfa")}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.row} onPress={onSortByDate}>
         <Ionicons name="calendar" size={24} color={iconColor} />
         <Text style={[styles.rowText, { color: textColor }]}>
-          Sorteer op datum
+          {t("sortDate")}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.row} onPress={onCopy}>
         <Ionicons name="share-social-outline" size={24} color={iconColor} />
         <Text style={[styles.rowText, { color: textColor }]}>
-          Kopie verzenden
+          {t("copySend")}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.row} onPress={onPrint}>
         <Ionicons name="print-outline" size={24} color={iconColor} />
-        <Text style={[styles.rowText, { color: textColor }]}>
-          Lijst afdrukken
-        </Text>
+        <Text style={[styles.rowText, { color: textColor }]}>{t("print")}</Text>
       </TouchableOpacity>
     </View>
   );

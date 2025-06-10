@@ -8,15 +8,16 @@ import {
   TextInput,
   Pressable,
   TouchableOpacity,
-  FlatList,
   SafeAreaView,
   Modal,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Keyboard,
-  useColorScheme,
 } from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ListsContext, Task } from "../../context/ListsContext";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
@@ -27,14 +28,16 @@ import * as Sharing from "expo-sharing";
 import useTasks from "../../hooks/useTasks";
 import FilterBar from "../../components/FilterBar";
 import OptionsSheet from "../../components/OptionsSheet";
-import { baseMenu } from "../../utils/menuDefaults";
+import { useBaseMenu } from "../../utils/menuDefaults";
 import DateTimePicker, {
   DateTimePickerAndroid,
 } from "@react-native-community/datetimepicker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemeContext } from "../../context/ThemeContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 export default function ListDetail() {
-  const scheme = useColorScheme();
+  const { scheme } = useContext(ThemeContext);
   const theme =
     scheme === "dark"
       ? {
@@ -52,17 +55,19 @@ export default function ListDetail() {
   // --- ROUTER & CONTEXT ---
   const { key } = useLocalSearchParams();
   const listKey = Array.isArray(key) ? key[0] : key;
+  const { lang, setLang, t } = useLanguage();
+  const baseMenu = useBaseMenu();
   const router = useRouter();
   const navigation = useNavigation();
   const { lists, setLists, tasksMap, setTasksMap } = useContext(ListsContext);
 
   const isCustom = lists.some((l) => l.key === listKey);
 
-  // Determine display label: custom if exists, otherwise standard, otherwise fallback "Lijst"
+  // Determine display label: custom if exists, otherwise standard, otherwise fallback translation
   const listLabel =
     lists.find((l) => l.key === listKey)?.label ||
     baseMenu.find((m) => m.key === listKey)?.label ||
-    "Lijst";
+    t("tasks");
 
   // --- STATE FOR TASKS & REMINDERS ---
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -262,8 +267,19 @@ export default function ListDetail() {
   });
 
   // --- RENDEREN VAN ÉÉN TAKENREGEL ---
-  const renderTask = ({ item }: { item: Task }) => (
+  const renderTask = ({ item, drag, isActive }: RenderItemParams<Task>) => (
     <View style={[styles.taskCard, { backgroundColor: theme.cardBackground }]}>
+      <TouchableOpacity
+        onLongPress={drag}
+        disabled={isActive}
+        style={{ padding: 8, justifyContent: "center", alignItems: "center" }}
+      >
+        <MaterialCommunityIcons
+          name="drag"
+          size={24}
+          color={scheme === "dark" ? "#FFF" : "#333"}
+        />
+      </TouchableOpacity>
       <Pressable
         onPress={() => toggleTask(item.id)}
         onLongPress={() => {
@@ -353,7 +369,7 @@ export default function ListDetail() {
                       <Text
                         style={{ fontSize: 12, color: theme.secondaryText }}
                       >
-                        {new Date(item.dueDate).toLocaleString(undefined, {
+                        {new Date(item.dueDate).toLocaleString(lang, {
                           dateStyle: "short",
                           timeStyle: "short",
                         })}
@@ -365,6 +381,7 @@ export default function ListDetail() {
                   <>
                     <TouchableOpacity
                       onPress={() => {
+                        Keyboard.dismiss();
                         setShowInputDatePicker(false);
                         setDatePickerFor(item.id);
                       }}
@@ -373,7 +390,7 @@ export default function ListDetail() {
                       <Text
                         style={{ fontSize: 12, color: theme.secondaryText }}
                       >
-                        {new Date(item.dueDate).toLocaleString(undefined, {
+                        {new Date(item.dueDate).toLocaleString(lang, {
                           dateStyle: "short",
                           timeStyle: "short",
                         })}
@@ -385,6 +402,8 @@ export default function ListDetail() {
                           value={item.dueDate!}
                           mode="datetime"
                           display="inline"
+                          themeVariant={scheme === "dark" ? "dark" : "light"}
+                          locale={lang}
                           onChange={async (_, selectedDate) => {
                             if (selectedDate) {
                               // cancel old
@@ -437,7 +456,6 @@ export default function ListDetail() {
           </>
         )}
       </Pressable>
-
       {datePickerFor !== item.id && (
         <TouchableOpacity
           onPress={() => deleteTask(item.id)}
@@ -465,7 +483,7 @@ export default function ListDetail() {
               onSubmitEditing={commitRename}
               onBlur={commitRename}
               autoFocus
-              placeholder="Nieuwe lijstnaam"
+              placeholder={t("NewList")}
               placeholderTextColor={theme.secondaryText}
               style={[
                 styles.renameInput,
@@ -499,9 +517,8 @@ export default function ListDetail() {
         <TouchableOpacity
           style={{ marginRight: 8 }}
           onPress={() => {
-            // close any task pickers
+            Keyboard.dismiss();
             setDatePickerFor(null);
-            // toggle the input date picker
             setShowInputDatePicker((prev) => !prev);
           }}
         >
@@ -510,8 +527,12 @@ export default function ListDetail() {
         <TextInput
           value={newTask}
           onChangeText={setNewTask}
-          onFocus={() => setShowDatePicker(false)}
-          placeholder="Nieuwe taak"
+          onFocus={() => {
+            setShowDatePicker(false);
+            setShowInputDatePicker(false);
+            setDatePickerFor(null);
+          }}
+          placeholder={t("newTask")}
           placeholderTextColor={theme.secondaryText}
           style={[
             styles.input,
@@ -530,6 +551,8 @@ export default function ListDetail() {
             value={dueDate || new Date()}
             mode="datetime"
             display="inline"
+            themeVariant={scheme === "dark" ? "dark" : "light"}
+            locale={lang}
             onChange={(_, selectedDate) => {
               if (selectedDate) setDueDate(selectedDate);
             }}
@@ -539,7 +562,7 @@ export default function ListDetail() {
             onPress={() => setShowInputDatePicker(false)}
             style={styles.dateDoneButton}
           >
-            <Text style={styles.dateDoneText}>Gereed</Text>
+            <Text style={styles.dateDoneText}>{t("Done")}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -552,12 +575,16 @@ export default function ListDetail() {
       {/* ------------------------------------------------------- */}
 
       {/* Takenlijst: gebruik nu filteredTasks i.p.v. tasks */}
-      <FlatList
-        data={filteredTasks}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ flexGrow: 1 }}
-        renderItem={renderTask}
-      />
+      <View style={{ flex: 1 }}>
+        <DraggableFlatList
+          data={filteredTasks}
+          onDragEnd={({ data }) => setTasks(data)}
+          keyExtractor={(item) => item.id}
+          renderItem={renderTask}
+          activationDistance={10}
+          contentContainerStyle={{ paddingBottom: 100 }}
+        />
+      </View>
 
       <Modal
         visible={showOptions}

@@ -21,9 +21,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  useColorScheme,
   Pressable,
 } from "react-native";
+import DraggableFlatList, {
+  RenderItemParams,
+} from "react-native-draggable-flatlist";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -34,11 +36,15 @@ import * as Print from "expo-print";
 import * as Notifications from "expo-notifications";
 import useTasks from "../hooks/useTasks";
 import OptionsSheet from "../components/OptionsSheet";
+import { ThemeContext } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function NewListScreen() {
+  const { lang, setLang, t } = useLanguage();
+
   // Generate a stable key for this new list, to pass to notifications
   const newListKeyRef = useRef<string>(Date.now().toString());
-  const scheme = useColorScheme();
+  const { scheme } = useContext(ThemeContext);
   const theme =
     scheme === "dark"
       ? {
@@ -96,13 +102,8 @@ export default function NewListScreen() {
   // Sla lijst & taken op bij verlaten
   useEffect(() => {
     return navigation.addListener("beforeRemove", () => {
-      // Cancel any scheduled notifications for tasks being discarded
-      tasks.forEach((t) => {
-        if (t.notificationId) {
-          Notifications.cancelScheduledNotificationAsync(t.notificationId);
-        }
-      });
-      const label = title.trim() || "Naamloze lijst";
+      // Persist new list and tasks when leaving
+      const label = title.trim() || t("NamelesList");
       const newKey = newListKeyRef.current;
       setLists((prev) => [
         ...prev,
@@ -137,11 +138,7 @@ export default function NewListScreen() {
     setEditingId(null);
   };
 
-  const renderTask = ({
-    item,
-  }: {
-    item: { id: string; title: string; done: boolean; dueDate: Date | null };
-  }) => (
+  const renderTask = ({ item, drag, isActive }: RenderItemParams<Task>) => (
     <>
       <View
         style={[
@@ -149,6 +146,17 @@ export default function NewListScreen() {
           { backgroundColor: scheme === "dark" ? "#333333" : "#FFFFFF" },
         ]}
       >
+        <TouchableOpacity
+          onLongPress={drag}
+          disabled={isActive}
+          style={{ padding: 8, justifyContent: "center", alignItems: "center" }}
+        >
+          <MaterialCommunityIcons
+            name="drag"
+            size={24}
+            color={scheme === "dark" ? "#FFF" : "#333"}
+          />
+        </TouchableOpacity>
         <TouchableOpacity
           onPress={() => toggleTask(item.id)}
           onLongPress={() => {
@@ -232,6 +240,7 @@ export default function NewListScreen() {
                         },
                       });
                     } else {
+                      Keyboard.dismiss();
                       setShowDatePicker(false);
                       setEditingDateId(item.id);
                     }
@@ -245,7 +254,7 @@ export default function NewListScreen() {
                       marginTop: 2,
                     }}
                   >
-                    {new Date(item.dueDate).toLocaleString(undefined, {
+                    {new Date(item.dueDate).toLocaleString(lang, {
                       dateStyle: "short",
                       timeStyle: "short",
                     })}
@@ -272,6 +281,8 @@ export default function NewListScreen() {
             }
             mode="datetime"
             display="inline"
+            themeVariant={scheme === "dark" ? "dark" : "light"}
+            locale={lang}
             onChange={async (_, selected) => {
               if (selected) {
                 try {
@@ -324,7 +335,7 @@ export default function NewListScreen() {
   const handlePrint = async () => {
     if (isPrinting) return;
     setIsPrinting(true);
-    const label = title.trim() || "Naamloze lijst";
+    const label = title.trim() || t("NamelesList");
     const htmlLines = [
       `<h1 style="font-family: sans-serif;">${label}</h1>`,
       `<p style="font-family: sans-serif;">Taken:</p>`,
@@ -364,7 +375,7 @@ export default function NewListScreen() {
         <TextInput
           value={title}
           onChangeText={setTitle}
-          placeholder="Naamloze lijst"
+          placeholder={t("NamelesList")}
           placeholderTextColor={theme.placeholder}
           style={[
             styles.titleInput,
@@ -417,8 +428,11 @@ export default function NewListScreen() {
         <TextInput
           value={newTask}
           onChangeText={setNewTask}
-          onFocus={() => setShowDatePicker(false)}
-          placeholder="Nieuwe taak"
+          onFocus={() => {
+            setShowDatePicker(false);
+            setEditingDateId(null);
+          }}
+          placeholder={t("newTask")}
           placeholderTextColor={theme.placeholder}
           style={[
             styles.input,
@@ -435,6 +449,8 @@ export default function NewListScreen() {
             value={dueDate || new Date()}
             mode="datetime"
             display="inline"
+            themeVariant={scheme === "dark" ? "dark" : "light"}
+            locale={lang}
             onChange={(_, selectedDate) => {
               if (selectedDate) setDueDate(selectedDate);
             }}
@@ -444,16 +460,18 @@ export default function NewListScreen() {
             onPress={() => setShowDatePicker(false)}
             style={styles.dateDoneButton}
           >
-            <Text style={styles.dateDoneText}>Gereed</Text>
+            <Text style={styles.dateDoneText}>{t("Done")}</Text>
           </TouchableOpacity>
         </View>
       )}
 
-      <FlatList
+      <DraggableFlatList
         data={tasks}
+        onDragEnd={({ data }) => setTasks(data)}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 100 }}
         renderItem={renderTask}
+        activationDistance={20}
+        contentContainerStyle={{ paddingBottom: 100 }}
       />
 
       {/* Options Bottom Sheet */}
@@ -523,7 +541,7 @@ export default function NewListScreen() {
           />
           <View style={styles.sheet}>
             <ShareModal
-              listTitle={title.trim() || "Naamloze lijst"}
+              listTitle={title.trim() || t("NamelesList")}
               tasks={tasks}
               onClose={() => setShowShare(false)}
             />

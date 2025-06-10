@@ -1,5 +1,5 @@
 // components/BottomBar.js
-import React from "react";
+import React, { useContext } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useLanguage } from "..//context/LanguageContext";
+import { ThemeContext } from "../context/ThemeContext";
 
 const getStyles = (scheme) =>
   StyleSheet.create({
@@ -43,14 +45,15 @@ const getStyles = (scheme) =>
   });
 
 export default function BottomBar({ onNewList }) {
-  const scheme = useColorScheme();
+  const { lang, setLang, t } = useLanguage();
+  const { scheme } = useContext(ThemeContext);
   const styles = getStyles(scheme);
 
   return (
     <View style={styles.container}>
       <TouchableOpacity onPress={onNewList} style={styles.button}>
         <Ionicons name="add-circle-outline" size={24} color="#3B82F6" />
-        <Text style={styles.buttonText}>Nieuwe lijst</Text>
+        <Text style={styles.buttonText}>{t("NewList")}</Text>
       </TouchableOpacity>
     </View>
   );

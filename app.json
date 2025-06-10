@@ -2,8 +2,10 @@
   "expo": {
     "name": "Go-To-Go",
     "slug": "todos-app",
-    "assetBundlePatterns": ["assets/**/*"],
-    "version": "1.0.11",
+    "assetBundlePatterns": [
+      "assets/**/*"
+    ],
+    "version": "1.0.12",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +19,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gogo22.todosapp",
-      "buildNumber": "20",
+      "buildNumber": "21",
       "icon": {
         "dark": "./assets/dark-icon.png",
         "light": "./assets/icon.png",
@@ -37,7 +39,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.gogo22.todosapp",
-      "versionCode": 20
+      "versionCode": 21
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
@@ -59,7 +61,8 @@
           "backgroundColor": "#ff8d9e"
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-localization"
     ],
     "extra": {
       "router": {},

@@ -1,12 +1,7 @@
-import React from "react";
-import {
-  View,
-  Text,
-  Image,
-  TouchableOpacity,
-  useColorScheme,
-} from "react-native";
+import React, { useContext } from "react";
+import { View, Text, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { ThemeContext } from "../context/ThemeContext";
 
 export default function Header({
   username,
@@ -14,7 +9,7 @@ export default function Header({
   onSearch,
   onAvatarPress,
 }) {
-  const scheme = useColorScheme();
+  const { scheme } = useContext(ThemeContext);
   const isDark = scheme === "dark";
 
   return (

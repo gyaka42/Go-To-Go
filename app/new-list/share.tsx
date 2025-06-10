@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+import React, { FC, useState, useContext } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useColorScheme } from "react-native";
+import { ThemeContext } from "../../context/ThemeContext";
 
 interface Props {
   listTitle: string;
@@ -18,7 +18,7 @@ interface Props {
 }
 
 const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
-  const scheme = useColorScheme();
+  const { scheme } = useContext(ThemeContext);
   const iconColor = scheme === "dark" ? "#FFF" : "#000";
   const styles = getStyles(scheme);
   const [email, setEmail] = useState("");

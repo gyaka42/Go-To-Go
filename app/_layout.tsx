@@ -1,18 +1,22 @@
 // app/_layout.tsx
-import React, { useEffect } from "react";
-import { Platform, useColorScheme } from "react-native";
+import React, { useEffect, useContext } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter } from "expo-router";
-import { ListsProvider } from "../context/ListsContext";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import * as ImagePicker from "expo-image-picker";
+import { ThemeProvider, ThemeContext } from "../context/ThemeContext";
+import { ListsProvider } from "../context/ListsContext";
+import { LanguageProvider } from "../context/LanguageContext";
+import { useLanguage } from "../context/LanguageContext";
 
 // Houd splash actief totdat we permissions geregeld hebben
 SplashScreen.preventAutoHideAsync();
 
-export default function Layout() {
-  const scheme = useColorScheme();
+function InnerLayout() {
+  const { scheme } = useContext(ThemeContext);
+  const { t } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
@@ -38,6 +42,11 @@ export default function Layout() {
       Notifications.addNotificationResponseReceivedListener((response) => {
         const { listKey } = response.notification.request.content.data;
         if (listKey) {
+          // Pop all the way back to the root screen
+          while (router.canGoBack()) {
+            router.back();
+          }
+          // Then navigate to the specific list
           router.push(`/list/${listKey}`);
         }
       });
@@ -59,31 +68,41 @@ export default function Layout() {
   }, []);
 
   return (
+    <Stack
+      screenOptions={{
+        // dynamische header-kleur
+        headerStyle: {
+          backgroundColor:
+            scheme === "dark"
+              ? "#111" /* donker roze alternatief */
+              : "#FDA4AF",
+        },
+        headerTintColor: scheme === "dark" ? "#FFF" : "#000",
+        headerTitleStyle: { fontSize: 18, fontWeight: "600" },
+        headerShadowVisible: false,
+      }}
+    >
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="index"
+        options={{ title: t("homeTitle"), headerTitleAlign: "center" }}
+      />
+      <Stack.Screen name="new-list" options={{ title: t("newListTitle") }} />
+      <Stack.Screen name="search" options={{ title: t("searchTitle") }} />
+    </Stack>
+  );
+}
+
+export default function Layout() {
+  return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ListsProvider>
-        <Stack
-          screenOptions={{
-            // dynamische header-kleur
-            headerStyle: {
-              backgroundColor:
-                scheme === "dark"
-                  ? "#111" /* donker roze alternatief */
-                  : "#FDA4AF",
-            },
-            headerTintColor: scheme === "dark" ? "#FFF" : "#000",
-            headerTitleStyle: { fontSize: 18, fontWeight: "600" },
-            headerShadowVisible: false,
-          }}
-        >
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="index"
-            options={{ title: "Go-To-Go", headerTitleAlign: "center" }}
-          />
-          <Stack.Screen name="new-list" options={{ title: "Nieuwe lijst" }} />
-          <Stack.Screen name="search" options={{ title: "Zoeken" }} />
-        </Stack>
-      </ListsProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <ListsProvider>
+            <InnerLayout />
+          </ListsProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </GestureHandlerRootView>
   );
 }

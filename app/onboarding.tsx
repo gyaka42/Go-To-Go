@@ -1,5 +1,5 @@
 // app/onboarding.tsx
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 import {
   View,
   Text,
@@ -9,17 +9,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
-  useColorScheme,
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemeContext } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function Onboarding() {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const router = useRouter();
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { scheme } = useContext(ThemeContext);
+  const isDark = scheme === "dark";
   const theme = {
     wrapperBg: isDark ? "#1F2937" : "#F9FAFB",
     titleColor: isDark ? "#F9FAFB" : "#111827",
@@ -46,7 +48,7 @@ export default function Onboarding() {
       <View style={[styles.wrapper, { backgroundColor: theme.wrapperBg }]}>
         {/* Korte Titel */}
         <Text style={[styles.title, { color: theme.titleColor }]}>
-          Welkom Bij
+          {t("welcomeTo")}
         </Text>
 
         {/* Afbeelding met afgeronde hoeken */}
@@ -58,7 +60,7 @@ export default function Onboarding() {
 
         {/* Instructietekst */}
         <Text style={[styles.subtitle, { color: theme.subtitleColor }]}>
-          Vul hieronder je voornaam in om te beginnen
+          {t("name")}
         </Text>
 
         {/* Invoerveld */}
@@ -71,7 +73,7 @@ export default function Onboarding() {
               color: theme.inputText,
             },
           ]}
-          placeholder="Bijv. Gökhan"
+          placeholder={t("placeHolder")}
           placeholderTextColor={theme.placeholder}
           value={name}
           onChangeText={setName}
@@ -89,7 +91,7 @@ export default function Onboarding() {
           disabled={name.trim().length === 0}
         >
           <Text style={[styles.buttonText, { color: theme.buttonText }]}>
-            Verder
+            {t("further")}
           </Text>
         </TouchableOpacity>
       </View>

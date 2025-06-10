@@ -9,12 +9,14 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { useColorScheme, ColorSchemeName } from "react-native";
+import {} from "react-native";
 import { ListsContext } from "../context/ListsContext";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { baseMenu } from "../utils/menuDefaults";
+import { useBaseMenu } from "../utils/menuDefaults";
 import FilterBar from "../components/FilterBar";
+import { ThemeContext } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 
 interface SearchResult {
   id: string;
@@ -32,8 +34,11 @@ export default function SearchScreen() {
   const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
   const router = useRouter();
 
-  const colorScheme = useColorScheme();
-  const styles = getStyles(colorScheme);
+  const { scheme } = useContext(ThemeContext);
+  const baseMenu = useBaseMenu();
+  const styles = getStyles(scheme);
+
+  const { t } = useLanguage();
 
   useEffect(() => {
     if (!query.trim()) {
@@ -79,7 +84,7 @@ export default function SearchScreen() {
     <SafeAreaView style={styles.container}>
       <TextInput
         style={styles.input}
-        placeholder="Zoek in al je taken…"
+        placeholder={t("searchPlaceholder")}
         value={query}
         onChangeText={setQuery}
         autoCorrect={false}
@@ -96,7 +101,7 @@ export default function SearchScreen() {
         keyExtractor={(item) => item.id + "@" + item.listKey}
         ListEmptyComponent={() =>
           query.trim() ? (
-            <Text style={styles.empty}>Geen resultaten</Text>
+            <Text style={styles.empty}>{t("noResult")}</Text>
           ) : null
         }
         renderItem={({ item }) => (
@@ -113,7 +118,7 @@ export default function SearchScreen() {
   );
 }
 
-function getStyles(scheme: ColorSchemeName) {
+function getStyles(scheme: "light" | "dark" | null) {
   const isDark = scheme === "dark";
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: isDark ? "#000" : "#FFF" },

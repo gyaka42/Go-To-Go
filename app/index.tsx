@@ -1,5 +1,11 @@
 // app/index.tsx
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useCallback,
+  useLayoutEffect,
+} from "react";
 import * as Notifications from "expo-notifications";
 import {
   ActivityIndicator,
@@ -7,7 +13,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  useColorScheme,
 } from "react-native";
 import DraggableFlatList, {
   RenderItemParams,
@@ -19,14 +24,18 @@ import BottomBar from "../components/BottomBar";
 import Header from "../components/Header";
 import { useFocusEffect } from "@react-navigation/native";
 import { ListsContext, ListItem, Task } from "../context/ListsContext";
-import { baseMenu } from "../utils/menuDefaults";
+import { useBaseMenu } from "../utils/menuDefaults";
 import { MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useNavigation } from "@react-navigation/native";
+import { ThemeContext } from "../context/ThemeContext";
+import { useLanguage } from "../context/LanguageContext";
 
 export default function HomeScreen() {
   const router = useRouter();
   const { lists, setLists, tasksMap, setTasksMap } = useContext(ListsContext);
-  const scheme = useColorScheme(); // 'light' or 'dark'
+
+  const [order, setOrder] = useState<string[]>([]);
 
   // 1️⃣ Hooks die we altijd willen aanroepen – óók voordat we weten of we isReady zijn:
   const [isReady, setIsReady] = useState(false);
@@ -34,7 +43,77 @@ export default function HomeScreen() {
 
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const [order, setOrder] = useState<string[]>([]);
+
+  const navigation = useNavigation();
+  const { mode, setMode, scheme } = useContext(ThemeContext);
+  const { lang, setLang, t } = useLanguage();
+  const baseMenu = useBaseMenu();
+  const combined = [...baseMenu, ...lists].map((item) => {
+    const customTasks = tasksMap[item.key];
+    return {
+      ...item,
+      count:
+        customTasks !== undefined
+          ? customTasks.length
+          : counts[item.key] ?? null,
+    };
+  });
+
+  const orderedCombined = [
+    ...order.map((key) => combined.find((i) => i.key === key)).filter(Boolean),
+    ...combined.filter((i) => !order.includes(i.key)),
+  ];
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => {
+        return (
+          <>
+            {/* Language toggle */}
+            <TouchableOpacity
+              onPress={() =>
+                setLang(lang === "nl" ? "en" : lang === "en" ? "tr" : "nl")
+              }
+              style={{
+                marginRight: 16,
+                marginBottom: -12,
+                paddingHorizontal: 4,
+              }}
+            >
+              <Text style={{ fontSize: 20 }}>
+                {lang === "nl" ? "🇳🇱" : lang === "en" ? "🇬🇧" : "🇹🇷"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() =>
+                setMode(
+                  (mode === "system"
+                    ? "light"
+                    : mode === "light"
+                    ? "dark"
+                    : "system") as any
+                )
+              }
+              style={{ marginRight: 16, marginBottom: -12 }}
+            >
+              <MaterialIcons
+                name={
+                  mode === "dark"
+                    ? "dark-mode"
+                    : mode === "light"
+                    ? "light-mode"
+                    : "settings"
+                }
+                size={24}
+                color={scheme === "dark" ? "#FFF" : "#000"}
+              />
+            </TouchableOpacity>
+          </>
+        );
+      },
+    });
+  }, [navigation, mode, scheme, lang]);
+
   useEffect(() => {
     AsyncStorage.getItem("list_order").then((json) => {
       if (json) setOrder(JSON.parse(json));
@@ -102,24 +181,6 @@ export default function HomeScreen() {
     });
   };
 
-  // 7️⃣ Bereken welke items getoond worden op de home‐pagina
-  const combined = [...baseMenu, ...lists].map((item) => {
-    const customTasks = tasksMap[item.key];
-    return {
-      ...item,
-      count:
-        customTasks !== undefined
-          ? customTasks.length
-          : counts[item.key] ?? null,
-    };
-  });
-
-  // Apply saved order, then append any new items
-  const orderedCombined = [
-    ...order.map((key) => combined.find((i) => i.key === key)).filter(Boolean),
-    ...combined.filter((i) => !order.includes(i.key)),
-  ];
-
   // ──────────────────────────────────────────────────────
   // 8️⃣ Pas na alle “unconditional hooks”
   //     doen we de early return voor de loader:
@@ -179,7 +240,7 @@ export default function HomeScreen() {
             { color: scheme === "dark" ? "#FFF" : "#111827" },
           ]}
         >
-          Welkom terug{userName ? `, ${userName}` : ""}!
+          {t("welcome", { name: userName || "" })}
         </Text>
         <Text
           style={[
@@ -187,7 +248,7 @@ export default function HomeScreen() {
             { color: scheme === "dark" ? "#CCC" : "#6B7280" },
           ]}
         >
-          Hier zijn je to-do’s voor vandaag:
+          {t("todayTasks")}
         </Text>
       </View>
 
