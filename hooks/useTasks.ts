@@ -49,6 +49,7 @@ export default function useTasks(
         done: false,
         dueDate: dueDate || null,
         notificationId,
+        titleEditable: true,
       };
       setTasks((prev) => [...prev, task]);
     },
@@ -64,7 +65,11 @@ export default function useTasks(
             if (!t.done && t.notificationId) {
               Notifications.cancelScheduledNotificationAsync(t.notificationId);
             }
-            return { ...t, done: !t.done };
+            return {
+              ...t,
+              done: !t.done,
+              titleEditable: t.done, // alleen weer bewerkbaar als je taak 'ontdaan' wordt
+            };
           }
           return t;
         })

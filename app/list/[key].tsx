@@ -107,7 +107,15 @@ export default function ListDetail() {
       const saved = tasksMap[listKey] || [];
       const parsed = saved.map((t) => ({
         ...t,
-        dueDate: t.dueDate ? new Date(t.dueDate) : null,
+        dueDate: (() => {
+          if (!t.dueDate) return null;
+          if (typeof t.dueDate === "string") return new Date(t.dueDate);
+          try {
+            return new Date(t.dueDate);
+          } catch {
+            return null;
+          }
+        })(),
       }));
       setTasks(parsed);
     } else {
@@ -120,9 +128,18 @@ export default function ListDetail() {
           const parsedList: Task[] = savedTasks.map((t) => ({
             id: t.id,
             title: t.title,
-            done: t.done,
-            dueDate: t.dueDate ? new Date(t.dueDate) : null,
+            done: String(t.done) === "true",
+            dueDate: (() => {
+              if (!t.dueDate) return null;
+              if (typeof t.dueDate === "string") return new Date(t.dueDate);
+              try {
+                return new Date(t.dueDate);
+              } catch {
+                return null;
+              }
+            })(),
             notificationId: t.notificationId,
+            titleEditable: String(t.done) !== "true",
           }));
           setTasks(parsedList);
         })
@@ -153,6 +170,7 @@ export default function ListDetail() {
 
   const addTask = async () => {
     await hookAddTask(newTask, dueDate, listKey);
+    Keyboard.dismiss();
     setNewTask("");
     setDueDate(null);
     setShowDatePicker(false);
@@ -271,6 +289,7 @@ export default function ListDetail() {
     <View style={[styles.taskCard, { backgroundColor: theme.cardBackground }]}>
       <TouchableOpacity
         onLongPress={drag}
+        delayLongPress={150}
         disabled={isActive}
         style={{ padding: 8, justifyContent: "center", alignItems: "center" }}
       >
@@ -283,8 +302,10 @@ export default function ListDetail() {
       <Pressable
         onPress={() => toggleTask(item.id)}
         onLongPress={() => {
-          setEditingId(item.id);
-          setEditingText(item.title);
+          if (item.titleEditable) {
+            setEditingId(item.id);
+            setEditingText(item.title);
+          }
         }}
         delayLongPress={300}
         style={{ flex: 1, flexDirection: "column" }}
@@ -300,6 +321,7 @@ export default function ListDetail() {
               { flex: 1, marginLeft: 8, padding: 0, color: theme.text },
             ]}
             autoFocus
+            editable={item.titleEditable}
           />
         ) : (
           <>
@@ -316,140 +338,137 @@ export default function ListDetail() {
               <Text
                 style={[
                   styles.rowText,
-                  { color: theme.text },
-                  item.done && { color: theme.secondaryText },
                   { marginLeft: 8 },
+                  item.done
+                    ? { ...styles.rowDone, color: theme.secondaryText }
+                    : { color: theme.text },
                 ]}
               >
                 {item.title}
               </Text>
             </View>
-            {item.dueDate && (
-              <>
-                {Platform.OS === "android" ? (
-                  <>
-                    <TouchableOpacity
-                      onPress={() => {
-                        setDatePickerFor(item.id);
+            {Platform.OS === "android" ? (
+              <TouchableOpacity
+                onPress={() => {
+                  setDatePickerFor(item.id);
+                  const safeDueDate =
+                    item.dueDate instanceof Date &&
+                    !isNaN(item.dueDate.getTime())
+                      ? item.dueDate
+                      : new Date();
+
+                  DateTimePickerAndroid.open({
+                    value: safeDueDate,
+                    mode: "date",
+                    onChange: (event, selectedDate) => {
+                      setDatePickerFor(null);
+                      if (event.type === "set" && selectedDate) {
                         DateTimePickerAndroid.open({
-                          value: item.dueDate,
-                          mode: "date",
-                          onChange: (event, selectedDate) => {
-                            setDatePickerFor(null);
-                            if (event.type === "set" && selectedDate) {
-                              // then open time picker
-                              DateTimePickerAndroid.open({
-                                value: selectedDate,
-                                mode: "time",
-                                is24Hour: true,
-                                onChange: (evt2, selectedTime) => {
-                                  if (evt2.type === "set" && selectedTime) {
-                                    const combined = new Date(selectedDate);
-                                    combined.setHours(
-                                      selectedTime.getHours(),
-                                      selectedTime.getMinutes()
-                                    );
-                                    // update the task dueDate
-                                    setTasks((prev) =>
-                                      prev.map((t) =>
-                                        t.id === item.id
-                                          ? { ...t, dueDate: combined }
-                                          : t
-                                      )
-                                    );
-                                  }
-                                },
-                              });
-                            }
-                          },
-                        });
-                      }}
-                      style={{ marginLeft: 32, marginTop: 2 }}
-                    >
-                      <Text
-                        style={{ fontSize: 12, color: theme.secondaryText }}
-                      >
-                        {new Date(item.dueDate).toLocaleString(lang, {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </Text>
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  // iOS inline picker
-                  <>
-                    <TouchableOpacity
-                      onPress={() => {
-                        Keyboard.dismiss();
-                        setShowInputDatePicker(false);
-                        setDatePickerFor(item.id);
-                      }}
-                      style={{ marginLeft: 32, marginTop: 2 }}
-                    >
-                      <Text
-                        style={{ fontSize: 12, color: theme.secondaryText }}
-                      >
-                        {new Date(item.dueDate).toLocaleString(lang, {
-                          dateStyle: "short",
-                          timeStyle: "short",
-                        })}
-                      </Text>
-                    </TouchableOpacity>
-                    {datePickerFor === item.id && (
-                      <View style={styles.datePickerWrapper}>
-                        <DateTimePicker
-                          value={item.dueDate!}
-                          mode="datetime"
-                          display="inline"
-                          themeVariant={scheme === "dark" ? "dark" : "light"}
-                          locale={lang}
-                          onChange={async (_, selectedDate) => {
-                            if (selectedDate) {
-                              // cancel old
-                              const old = tasks.find((t) => t.id === item.id);
-                              if (old?.notificationId) {
-                                await Notifications.cancelScheduledNotificationAsync(
-                                  old.notificationId
-                                );
-                              }
-                              // schedule new
-                              const newId =
-                                await Notifications.scheduleNotificationAsync({
-                                  content: {
-                                    title: "Taakherinnering",
-                                    body: item.title,
-                                    data: { listKey },
-                                  },
-                                  trigger: {
-                                    type: "date",
-                                    date: selectedDate,
-                                  } as Notifications.DateTriggerInput,
-                                });
+                          value: selectedDate,
+                          mode: "time",
+                          is24Hour: true,
+                          onChange: (evt2, selectedTime) => {
+                            if (evt2.type === "set" && selectedTime) {
+                              const combined = new Date(selectedDate);
+                              combined.setHours(
+                                selectedTime.getHours(),
+                                selectedTime.getMinutes()
+                              );
                               setTasks((prev) =>
                                 prev.map((t) =>
                                   t.id === item.id
-                                    ? {
-                                        ...t,
-                                        dueDate: selectedDate,
-                                        notificationId: newId,
-                                      }
+                                    ? { ...t, dueDate: combined }
                                     : t
                                 )
                               );
                             }
-                          }}
-                          style={{ width: "90%" }}
-                        />
-                        <TouchableOpacity
-                          onPress={() => setDatePickerFor(null)}
-                          style={styles.dateDoneButton}
-                        >
-                          <Text style={styles.dateDoneText}>Gereed</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </>
+                          },
+                        });
+                      }
+                    },
+                  });
+                }}
+                style={{ marginLeft: 32, marginTop: 2 }}
+              >
+                <Text style={{ fontSize: 12, color: theme.secondaryText }}>
+                  {item.dueDate
+                    ? new Date(item.dueDate).toLocaleString(lang, {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                      })
+                    : t("SetReminder")}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              // behoud bestaande iOS-rendering zoals die al staat in de code
+              <>
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setShowInputDatePicker(false);
+                    setDatePickerFor(item.id);
+                  }}
+                  style={{ marginLeft: 32, marginTop: 2 }}
+                >
+                  <Text style={{ fontSize: 12, color: theme.secondaryText }}>
+                    {item.dueDate
+                      ? new Date(item.dueDate).toLocaleString(lang, {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })
+                      : t("SetReminder")}
+                  </Text>
+                </TouchableOpacity>
+                {datePickerFor === item.id && (
+                  <View style={styles.datePickerWrapper}>
+                    <DateTimePicker
+                      value={item.dueDate || new Date()}
+                      mode="datetime"
+                      display="inline"
+                      themeVariant={scheme === "dark" ? "dark" : "light"}
+                      locale={lang}
+                      onChange={async (_, selectedDate) => {
+                        if (selectedDate) {
+                          const old = tasks.find((t) => t.id === item.id);
+                          if (old?.notificationId) {
+                            await Notifications.cancelScheduledNotificationAsync(
+                              old.notificationId
+                            );
+                          }
+                          const newId =
+                            await Notifications.scheduleNotificationAsync({
+                              content: {
+                                title: "Taakherinnering",
+                                body: item.title,
+                                data: { listKey },
+                              },
+                              trigger: {
+                                type: "date",
+                                date: selectedDate,
+                              } as Notifications.DateTriggerInput,
+                            });
+                          setTasks((prev) =>
+                            prev.map((t) =>
+                              t.id === item.id
+                                ? {
+                                    ...t,
+                                    dueDate: selectedDate,
+                                    notificationId: newId,
+                                  }
+                                : t
+                            )
+                          );
+                        }
+                      }}
+                      style={{ width: "90%" }}
+                    />
+                    <TouchableOpacity
+                      onPress={() => setDatePickerFor(null)}
+                      style={styles.dateDoneButton}
+                    >
+                      <Text style={styles.dateDoneText}>Gereed</Text>
+                    </TouchableOpacity>
+                  </View>
                 )}
               </>
             )}
@@ -518,8 +537,34 @@ export default function ListDetail() {
           style={{ marginRight: 8 }}
           onPress={() => {
             Keyboard.dismiss();
-            setDatePickerFor(null);
-            setShowInputDatePicker((prev) => !prev);
+            if (Platform.OS === "android") {
+              DateTimePickerAndroid.open({
+                value: dueDate || new Date(),
+                mode: "date",
+                onChange: (event, selectedDate) => {
+                  if (event.type === "set" && selectedDate) {
+                    DateTimePickerAndroid.open({
+                      value: selectedDate,
+                      mode: "time",
+                      is24Hour: true,
+                      onChange: (evt2, selectedTime) => {
+                        if (evt2.type === "set" && selectedTime) {
+                          const combined = new Date(selectedDate);
+                          combined.setHours(
+                            selectedTime.getHours(),
+                            selectedTime.getMinutes()
+                          );
+                          setDueDate(combined);
+                        }
+                      },
+                    });
+                  }
+                },
+              });
+            } else {
+              setDatePickerFor(null);
+              setShowInputDatePicker((prev) => !prev);
+            }
           }}
         >
           <Ionicons name="calendar-outline" size={24} color="#2563EB" />
@@ -762,7 +807,8 @@ const styles = StyleSheet.create({
   },
   rowDone: {
     textDecorationLine: "line-through",
-    color: "#9CA3AF",
+    color: "#6B7280", // iets donkerder grijs
+    fontWeight: "500", // optioneel: iets vetter
   },
   deleteX: {
     color: "#EF4444",

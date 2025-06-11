@@ -43,6 +43,7 @@ export interface Task {
   done: boolean;
   dueDate: Date | null;
   notificationId?: string;
+  titleEditable: boolean;
 }
 
 export function ListsProvider({ children }: ListsProviderProps) {

@@ -1,6 +1,6 @@
 {
   "welcome": "Tekrar hoş geldin, {{name}}!",
-  "todayTasks": "Bugün yapılacakların şunlardır:",
+  "todayTasks": "Bugün yapılacak görevler:",
   "NewList": "Yeni Liste",
   "newTask": "Yeni Görev",
   "myDay": "Benim Günüm",

@@ -74,11 +74,8 @@ export default function HomeScreen() {
               onPress={() =>
                 setLang(lang === "nl" ? "en" : lang === "en" ? "tr" : "nl")
               }
-              style={{
-                marginRight: 16,
-                marginBottom: -12,
-                paddingHorizontal: 4,
-              }}
+              style={{ marginRight: 16, paddingHorizontal: 4 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Text style={{ fontSize: 20 }}>
                 {lang === "nl" ? "🇳🇱" : lang === "en" ? "🇬🇧" : "🇹🇷"}
@@ -94,7 +91,8 @@ export default function HomeScreen() {
                     : "system") as any
                 )
               }
-              style={{ marginRight: 16, marginBottom: -12 }}
+              style={{ marginRight: 16 }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <MaterialIcons
                 name={

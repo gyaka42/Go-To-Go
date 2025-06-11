@@ -126,6 +126,7 @@ export default function NewListScreen() {
 
   const addTask = async () => {
     await hookAddTask(newTask, dueDate, newListKeyRef.current);
+    Keyboard.dismiss();
     setNewTask("");
     setDueDate(null);
     setShowDatePicker(false);
