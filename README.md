@@ -38,7 +38,11 @@ De iOS-versie van **Go-To-Go Task!** is nu live in de App Store. Je kunt de app 
 
 [Download Go-To-Go Task! op iOS](https://apps.apple.com/us/app/go-to-go-task/id6746943031)
 
-## ![App Demo](./demo.gif)
+## Demo
+
+<p align="center">
+  <img src="./demo.gif" alt="App Demo" width="400" />
+</p>
 
 ## Belangrijke onderdelen
 
