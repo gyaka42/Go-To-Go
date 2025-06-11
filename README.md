@@ -1,4 +1,3 @@
-# Go-To-Go
 
 # Go-To-Go Task!
 
@@ -78,5 +77,4 @@ Bijdragen zijn welkom!
 
 ## Licentie
 
-MIT License © 2025 [Jouw Naam of Organisatie]  
-Zie [LICENSE](LICENSE) voor details.
+MIT License © 2025 [Gokhan Yaka] 
