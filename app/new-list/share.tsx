@@ -1,3 +1,4 @@
+import * as MailComposer from "expo-mail-composer";
 import React, { FC, useState, useContext } from "react";
 import {
   View,
@@ -5,11 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Linking,
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../../context/ThemeContext";
+import { useLanguage } from "../../context/LanguageContext";
 
 interface Props {
   listTitle: string;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
+  const { t } = useLanguage();
   const { scheme } = useContext(ThemeContext);
   const iconColor = scheme === "dark" ? "#FFF" : "#000";
   const styles = getStyles(scheme);
@@ -25,30 +27,37 @@ const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
 
   const sendInvite = async () => {
     if (!email.trim()) return;
-    // Bouw de body: lijstnaam + alle taken
-    const bodyLines = [
-      `Je bent uitgenodigd voor de takenlijst: "${listTitle}".`,
-      ``,
-      `Taken:`,
-      ...tasks.map((t, i) => `${i + 1}. ${t.title} [${t.done ? "✓" : "✗"}]`),
-    ];
-    const subject = `Uitnodiging: ${listTitle}`;
-    const body = encodeURIComponent(bodyLines.join("\n"));
-    const mailto = `mailto:${email}?subject=${encodeURIComponent(
-      subject
-    )}&body=${body}`;
-
-    // Probeer de mailto-link te openen
+    // Construct deep-link URL for importing the list in-app
+    const deepLinkUrl = `gotogo://import?title=${encodeURIComponent(
+      listTitle
+    )}&tasks=${encodeURIComponent(JSON.stringify(tasks))}`;
+    const subject = t("shareListSubject", { listTitle });
+    const htmlBody = `
+      <h2>${t("shareList")} "${listTitle}"</h2>
+      <p>${t("shareListIntro")}</p>
+      <ul>
+        ${tasks
+          .map(
+            (t, i) => `<li>${i + 1}. ${t.done ? "✅" : "🔲"} ${t.title}</li>`
+          )
+          .join("")}
+      </ul>
+      <p>
+        <a href="${deepLinkUrl}">
+          ${t("openInApp")}
+        </a>
+      </p>
+    `;
     try {
-      const supported = await Linking.canOpenURL(mailto);
-      if (!supported) {
-        Alert.alert("Fout", "Kan de mail-app niet openen op dit apparaat.");
-        return;
-      }
-      await Linking.openURL(mailto);
+      await MailComposer.composeAsync({
+        subject,
+        recipients: [email.trim()],
+        body: htmlBody,
+        isHtml: true,
+      });
       onClose();
     } catch (err) {
-      Alert.alert("Fout", "Er is iets misgegaan bij het openen van mail.");
+      Alert.alert("Fout", t("shareError"));
       console.error(err);
     }
   };
@@ -56,14 +65,16 @@ const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Lijst delen: {listTitle}</Text>
+        <Text style={styles.headerTitle}>
+          {t("shareList")} {listTitle}
+        </Text>
         <TouchableOpacity onPress={onClose}>
           <Ionicons name="close" size={24} color={iconColor} />
         </TouchableOpacity>
       </View>
       <View style={styles.content}>
         <TextInput
-          placeholder="E-mailadres"
+          placeholder="E-mail"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -75,7 +86,7 @@ const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
           onPress={sendInvite}
           disabled={!email.trim()}
         >
-          <Text style={styles.buttonText}>Verstuur uitnodiging</Text>
+          <Text style={styles.buttonText}>{t("send")}</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -11,6 +11,12 @@
   "filterAll": "Herşey",
   "filterOpen": "Açık",
   "filterDone": "Tamamlanmış",
+  "send": "Gönder",
+  "shareList": "Liste paylaş:",
+  "shareListSubject": "Davet: {{listTitle}}",
+  "shareListIntro": "Seninle paylaşmak istediğim görev listesi:",
+  "openInApp": "Go-To-Go Uygulamasında Aç",
+  "shareError": "E-posta gönderilirken bir hata oluştu.",
   "noResult": "Sonuç yok",
   "homeTitle": "Go-To-Go",
   "newListTitle": "Yeni liste",
@@ -25,5 +31,6 @@
   "welcomeTo": "Hoş Geldiniz",
   "name": "Başlamak için aşağıya adınızı girin",
   "further": "Devam",
-  "placeHolder": "Örnek. Gökhan"
+  "placeHolder": "Örnek. Gökhan",
+  "SetReminder": "Hatırlatıcı ayarla"
 }

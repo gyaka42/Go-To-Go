@@ -11,6 +11,12 @@
   "filterAll": "All",
   "filterOpen": "Open",
   "filterDone": "Completed",
+  "send": "Send",
+  "shareList": "Share list:",
+  "shareListSubject": "Invitation: {{listTitle}}",
+  "shareListIntro": "Here’s the task list I’d like to share with you:",
+  "openInApp": "Open in Go-To-Go App",
+  "shareError": "Something went wrong while sending the email.",
   "noResult": "No result",
   "homeTitle": "Go-To-Go",
   "newListTitle": "New List",
@@ -25,5 +31,6 @@
   "welcomeTo": "Welcome to",
   "name": "Enter your first name below to get started",
   "further": "Continue",
-  "placeHolder": "Example. Gökhan"
+  "placeHolder": "Example. Gökhan",
+  "SetReminder": "Set Reminder"
 }

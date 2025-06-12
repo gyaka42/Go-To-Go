@@ -1,4 +1,3 @@
-
 # Go-To-Go Task!
 
 **Go-To-Go Task!** is een moderne, cross-platform to‑do app gebouwd met React Native en Expo. Met deze app kun je:
@@ -77,4 +76,4 @@ Bijdragen zijn welkom!
 
 ## Licentie
 
-MIT License © 2025 [Gokhan Yaka] 
+MIT License © 2025 [Gokhan Yaka]

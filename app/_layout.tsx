@@ -1,6 +1,5 @@
 // app/_layout.tsx
 import React, { useEffect, useContext } from "react";
-import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";

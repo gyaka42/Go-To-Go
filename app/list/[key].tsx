@@ -67,7 +67,7 @@ export default function ListDetail() {
   const listLabel =
     lists.find((l) => l.key === listKey)?.label ||
     baseMenu.find((m) => m.key === listKey)?.label ||
-    t("tasks");
+    listKey;
 
   // --- STATE FOR TASKS & REMINDERS ---
   const [tasks, setTasks] = useState<Task[]>([]);

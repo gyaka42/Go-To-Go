@@ -11,6 +11,12 @@
   "filterAll": "Alles",
   "filterOpen": "Open",
   "filterDone": "Voltooid",
+  "send": "Verstuur",
+  "shareList": "Lijst delen:",
+  "shareListSubject": "Uitnodiging: {{listTitle}}",
+  "shareListIntro": "Hier is de takenlijst die ik graag met je deel:",
+  "openInApp": "Open in Go-To-Go-app",
+  "shareError": "Er is iets misgegaan bij het versturen van de e-mail.",
   "noResult": "Geen resultaat",
   "homeTitle": "Go-To-Go",
   "newListTitle": "Nieuwe lijst",
@@ -25,5 +31,6 @@
   "welcomeTo": "Welkom Bij",
   "name": "Vul hieronder je voornaam in om te beginnen",
   "further": "Verder",
-  "placeHolder": "Bijv. Gökhan"
+  "placeHolder": "Bijv. Gökhan",
+  "SetReminder": "Herinnering instellen"
 }
