@@ -13,6 +13,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Modal,
 } from "react-native";
 import DraggableFlatList, {
   RenderItemParams,
@@ -26,6 +27,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { ListsContext, ListItem, Task } from "../context/ListsContext";
 import { useBaseMenu } from "../utils/menuDefaults";
 import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons as Icon } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import { ThemeContext } from "../context/ThemeContext";
@@ -36,6 +38,8 @@ export default function HomeScreen() {
   const { lists, setLists, tasksMap, setTasksMap } = useContext(ListsContext);
 
   const [order, setOrder] = useState<string[]>([]);
+
+  const [langMenuVisible, setLangMenuVisible] = useState(false);
 
   // 1️⃣ Hooks die we altijd willen aanroepen – óók voordat we weten of we isReady zijn:
   const [isReady, setIsReady] = useState(false);
@@ -69,17 +73,17 @@ export default function HomeScreen() {
       headerRight: () => {
         return (
           <>
-            {/* Language toggle */}
+            {/* Language dropdown menu */}
             <TouchableOpacity
-              onPress={() =>
-                setLang(lang === "nl" ? "en" : lang === "en" ? "tr" : "nl")
-              }
+              onPress={() => setLangMenuVisible(true)}
               style={{ marginRight: 16, paddingHorizontal: 4 }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
-              <Text style={{ fontSize: 20 }}>
-                {lang === "nl" ? "🇳🇱" : lang === "en" ? "🇬🇧" : "🇹🇷"}
-              </Text>
+              <Icon
+                name="public"
+                size={24}
+                color={scheme === "dark" ? "#FFF" : "#000"}
+              />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() =>
@@ -322,6 +326,65 @@ export default function HomeScreen() {
           <BottomBar onNewList={() => router.push("/new-list")} />
         </View>
       </View>
+      {langMenuVisible && (
+        <Modal
+          transparent
+          animationType="fade"
+          onRequestClose={() => setLangMenuVisible(false)}
+        >
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
+            onPress={() => setLangMenuVisible(false)}
+          />
+          <View
+            style={{
+              position: "absolute",
+              top: 60,
+              right: 16,
+              backgroundColor: scheme === "dark" ? "#333" : "#FFF",
+              borderRadius: 8,
+              padding: 8,
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOpacity: 0.1,
+              shadowRadius: 6,
+              shadowOffset: { width: 0, height: 2 },
+            }}
+          >
+            {["nl", "en", "tr", "de", "es", "fr"].map((code) => (
+              <TouchableOpacity
+                key={code}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  padding: 8,
+                }}
+                onPress={() => {
+                  setLang(code as any);
+                  setLangMenuVisible(false);
+                }}
+              >
+                <Text style={{ fontSize: 20, marginRight: 8 }}>
+                  {code === "nl"
+                    ? "🇳🇱"
+                    : code === "en"
+                    ? "🇬🇧"
+                    : code === "tr"
+                    ? "🇹🇷"
+                    : code === "de"
+                    ? "🇩🇪"
+                    : code === "es"
+                    ? "🇪🇸"
+                    : "🇫🇷"}
+                </Text>
+                <Text style={{ color: scheme === "dark" ? "#FFF" : "#000" }}>
+                  {code.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }

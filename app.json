@@ -3,7 +3,7 @@
     "name": "Go-To-Go",
     "slug": "todos-app",
     "assetBundlePatterns": ["assets/**/*"],
-    "version": "1.2.2",
+    "version": "1.2.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gogo22.todosapp",
-      "buildNumber": "4",
+      "buildNumber": "6",
       "icon": {
         "dark": "./assets/dark-icon.png",
         "light": "./assets/icon.png",
@@ -37,7 +37,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.gogo22.todosapp",
-      "versionCode": 4
+      "versionCode": 6
     },
     "notification": {
       "icon": "./assets/notification-icon.png",

@@ -5,10 +5,13 @@ import * as Localization from "expo-localization";
 import en from "../locales/en.json";
 import nl from "../locales/nl.json";
 import tr from "../locales/tr.json";
+import de from "../locales/de.json";
+import es from "../locales/es.json";
+import fr from "../locales/fr.json";
 
-const translations = { en, nl, tr };
+const translations = { en, nl, tr, de, es, fr };
 
-type Lang = "en" | "nl" | "tr";
+type Lang = "en" | "nl" | "tr" | "de" | "es" | "fr";
 
 type LanguageContextType = {
   lang: Lang;
@@ -33,12 +36,26 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       const storedLang = await AsyncStorage.getItem("lang");
-      if (storedLang === "en" || storedLang === "nl" || storedLang === "tr") {
-        setLangState(storedLang);
+      if (
+        storedLang === "en" ||
+        storedLang === "nl" ||
+        storedLang === "tr" ||
+        storedLang === "de" ||
+        storedLang === "es" ||
+        storedLang === "fr"
+      ) {
+        setLangState(storedLang as Lang);
       } else {
         const deviceLang = Localization.locale.split("-")[0];
-        if (deviceLang === "en" || deviceLang === "tr") {
-          setLangState(deviceLang);
+        if (
+          deviceLang === "en" ||
+          deviceLang === "nl" ||
+          deviceLang === "tr" ||
+          deviceLang === "de" ||
+          deviceLang === "es" ||
+          deviceLang === "fr"
+        ) {
+          setLangState(deviceLang as Lang);
         } else {
           setLangState("nl");
         }

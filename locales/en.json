@@ -32,5 +32,6 @@
   "name": "Enter your first name below to get started",
   "further": "Continue",
   "placeHolder": "Example. Gökhan",
-  "SetReminder": "Set Reminder"
+  "SetReminder": "Set Reminder",
+  "list": "List"
 }

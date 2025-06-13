@@ -67,7 +67,7 @@ export default function ListDetail() {
   const listLabel =
     lists.find((l) => l.key === listKey)?.label ||
     baseMenu.find((m) => m.key === listKey)?.label ||
-    listKey;
+    t("tasks");
 
   // --- STATE FOR TASKS & REMINDERS ---
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -192,7 +192,7 @@ export default function ListDetail() {
   const handlePrint = async () => {
     const htmlLines = [
       `<h1 style="font-family: sans-serif;">${
-        lists.find((l) => l.key === listKey)?.label || "Lijst"
+        lists.find((l) => l.key === listKey)?.label || t("list")
       }</h1>`,
       `<p style="font-family: sans-serif;">Taken:</p>`,
       `<ul style="font-family: sans-serif;">`,
@@ -466,7 +466,7 @@ export default function ListDetail() {
                       onPress={() => setDatePickerFor(null)}
                       style={styles.dateDoneButton}
                     >
-                      <Text style={styles.dateDoneText}>Gereed</Text>
+                      <Text style={styles.dateDoneText}>{t("Done")}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -689,7 +689,9 @@ export default function ListDetail() {
           />
           <View style={styles.sheet}>
             <ShareModal
-              listTitle={lists.find((l) => l.key === listKey)?.label || "Lijst"}
+              listTitle={
+                lists.find((l) => l.key === listKey)?.label || t("list")
+              }
               tasks={tasks}
               onClose={() => setShowShare(false)}
             />

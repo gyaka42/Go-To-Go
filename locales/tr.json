@@ -10,7 +10,7 @@
   "searchPlaceholder": "Görevler`de ara..",
   "filterAll": "Herşey",
   "filterOpen": "Açık",
-  "filterDone": "Tamamlanmış",
+  "filterDone": "Tamamlandı",
   "send": "Gönder",
   "shareList": "Liste paylaş:",
   "shareListSubject": "Davet: {{listTitle}}",
@@ -32,5 +32,6 @@
   "name": "Başlamak için aşağıya adınızı girin",
   "further": "Devam",
   "placeHolder": "Örnek. Gökhan",
-  "SetReminder": "Hatırlatıcı ayarla"
+  "SetReminder": "Hatırlatıcı ayarla",
+  "list": "Liste"
 }

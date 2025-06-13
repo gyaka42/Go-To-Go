@@ -2,17 +2,16 @@
 import React, { useState, useContext, useEffect } from "react";
 import {
   SafeAreaView,
+  View,
   TextInput,
   FlatList,
-  View,
   Text,
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import {} from "react-native";
-import { ListsContext } from "../context/ListsContext";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ListsContext } from "../context/ListsContext";
 import { useBaseMenu } from "../utils/menuDefaults";
 import FilterBar from "../components/FilterBar";
 import { ThemeContext } from "../context/ThemeContext";
@@ -27,31 +26,27 @@ interface SearchResult {
 }
 
 export default function SearchScreen() {
-  const { lists, tasksMap } = useContext(ListsContext);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  // toegevoegde filterMode state
-  const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
   const router = useRouter();
-
-  const { scheme } = useContext(ThemeContext);
+  const { lists, tasksMap } = useContext(ListsContext);
   const baseMenu = useBaseMenu();
-  const styles = getStyles(scheme);
-
+  const { scheme } = useContext(ThemeContext);
   const { t } = useLanguage();
 
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<SearchResult[]>([]);
+  const [filterMode, setFilterMode] = useState<"all" | "open" | "done">("all");
+
+  // Search logic
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       return;
     }
     const q = query.toLowerCase();
-
     (async () => {
       const allLists = [...baseMenu, ...lists];
       const matches: SearchResult[] = [];
       for (const lst of allLists) {
-        // custom-lijsten in context, anders uit AsyncStorage
         let tasks = tasksMap[lst.key];
         if (tasks === undefined) {
           const json = await AsyncStorage.getItem(`todos_${lst.key}`);
@@ -73,44 +68,100 @@ export default function SearchScreen() {
     })();
   }, [query, lists, tasksMap]);
 
-  // Filter resultaten op basis van filterMode
-  const filteredResults = results.filter((t) => {
-    if (filterMode === "open") return !t.done;
-    if (filterMode === "done") return t.done;
+  // Filter logic
+  const filteredResults = results.filter((item) => {
+    if (filterMode === "open") return !item.done;
+    if (filterMode === "done") return item.done;
     return true;
   });
 
   return (
-    <SafeAreaView style={styles.container}>
-      <TextInput
-        style={styles.input}
-        placeholder={t("searchPlaceholder")}
-        value={query}
-        onChangeText={setQuery}
-        autoCorrect={false}
-        autoCapitalize="none"
-      />
-      <FilterBar
-        mode={filterMode}
-        onChange={setFilterMode}
-        style={styles.filterBar}
-      />
+    <SafeAreaView
+      style={[
+        styles.container,
+        { backgroundColor: scheme === "dark" ? "#000" : "#F3F4F6" },
+      ]}
+    >
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={[
+            styles.input,
+            {
+              backgroundColor: scheme === "dark" ? "#222" : "#FFF",
+              color: scheme === "dark" ? "#FFF" : "#000",
+            },
+          ]}
+          placeholder={t("searchPlaceholder")}
+          placeholderTextColor={scheme === "dark" ? "#888" : "#999"}
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+          autoCapitalize="none"
+        />
+      </View>
+
+      <View style={styles.filterContainer}>
+        <FilterBar mode={filterMode} onChange={setFilterMode} />
+      </View>
 
       <FlatList
         data={filteredResults}
-        keyExtractor={(item) => item.id + "@" + item.listKey}
+        keyExtractor={(item) => `${item.id}@${item.listKey}`}
+        contentContainerStyle={
+          filteredResults.length
+            ? { paddingBottom: 16 }
+            : { flex: 1, justifyContent: "center" }
+        }
         ListEmptyComponent={() =>
           query.trim() ? (
-            <Text style={styles.empty}>{t("noResult")}</Text>
+            <Text
+              style={[
+                styles.emptyText,
+                { color: scheme === "dark" ? "#AAA" : "#666" },
+              ]}
+            >
+              {t("noResult")}
+            </Text>
           ) : null
         }
         renderItem={({ item }) => (
           <TouchableOpacity
-            style={styles.row}
+            style={[
+              styles.card,
+              { backgroundColor: scheme === "dark" ? "#333" : "#FFF" },
+            ]}
             onPress={() => router.replace(`/list/${item.listKey}`)}
           >
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.sub}>{item.listLabel}</Text>
+            <View style={styles.cardContent}>
+              <Text
+                style={[
+                  styles.cardTitle,
+                  { color: scheme === "dark" ? "#FFF" : "#111827" },
+                ]}
+              >
+                {item.title}
+              </Text>
+              <Text
+                style={[
+                  styles.cardSubtitle,
+                  { color: scheme === "dark" ? "#CCC" : "#6B7280" },
+                ]}
+              >
+                {item.listLabel}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: item.done ? "#10B981" : "#EF4444",
+                },
+              ]}
+            >
+              <Text style={styles.badgeText}>
+                {item.done ? t("filterDone") : t("filterOpen")}
+              </Text>
+            </View>
           </TouchableOpacity>
         )}
       />
@@ -118,36 +169,65 @@ export default function SearchScreen() {
   );
 }
 
-function getStyles(scheme: "light" | "dark" | null) {
-  const isDark = scheme === "dark";
-  return StyleSheet.create({
-    container: { flex: 1, backgroundColor: isDark ? "#000" : "#FFF" },
-    input: {
-      borderWidth: 1,
-      borderColor: isDark ? "#555" : "#DDD",
-      borderRadius: 8,
-      padding: 12,
-      margin: 16,
-      color: isDark ? "#FFF" : "#000",
-    },
-    filterBar: {
-      marginHorizontal: 16,
-      marginBottom: 12,
-      alignItems: "center",
-      paddingVertical: 4,
-    },
-    row: {
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderColor: isDark ? "#333" : "#EEE",
-    },
-    title: { fontSize: 16, color: isDark ? "#FFF" : "#111" },
-    sub: { fontSize: 12, color: isDark ? "#AAA" : "#666" },
-    empty: {
-      textAlign: "center",
-      marginTop: 32,
-      color: isDark ? "#AAA" : "#666",
-    },
-  });
-}
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  input: {
+    height: 44,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+  },
+  filterContainer: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 16,
+    marginVertical: 6,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+    overflow: "hidden",
+  },
+  cardContent: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  cardSubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    marginRight: 12,
+  },
+  badgeText: {
+    color: "#FFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  emptyText: {
+    textAlign: "center",
+    fontSize: 14,
+  },
+});
