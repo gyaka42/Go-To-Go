@@ -303,13 +303,12 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         JSON.stringify(notification, null, 2)
       );
       // --- BEGIN Debugging output for notificationId existence in tasks ---
-      const taskId = notification.notification.request.identifier;
+      const tappedNotifId = notification.notification.request.identifier;
       // 🆕 Sla notificationId op in state
-      const notificationId = notification.notification.request.identifier;
-      console.log("🔔 Notificatie-ID ontvangen:", notificationId);
-      setPendingNotificationId(notificationId);
+      console.log("🔔 Notificatie-ID ontvangen:", tappedNotifId);
+      setPendingNotificationId(tappedNotifId);
       // --- END Nieuw toegevoegd ---
-      const taskExists = tasks.some((t) => t.notificationId === taskId);
+      const taskExists = tasks.some((t) => t.notificationId === tappedNotifId);
       console.log("🔎 Bestaat de taak met dit notificationId?", taskExists);
       if (!taskExists) {
         console.log("❌ Geen bijpassende taak gevonden voor deze notificatie.");
@@ -328,22 +327,23 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         );
       }
       // --- [ScrollTest] Add logging after setting pendingNotificationRef.current ---
-      console.log("📦 [ScrollTest] Geregistreerde notificatie-ID:", taskId);
+      console.log(
+        "📦 [ScrollTest] Geregistreerde notificatie-ID:",
+        tappedNotifId
+      );
       console.log(
         "📦 [ScrollTest] Takenlijst op dat moment:",
         tasks.map((t) => ({ id: t.id, notifId: t.notificationId }))
       );
       // --- [End ScrollTest] ---
-      console.log(
-        "📦 pendingNotificationRef gezet op:",
-        notification.notification.request.identifier
-      );
+      console.log("📦 pendingNotificationRef gezet op:", tappedNotifId);
 
-      // Nu bepalen of router navigatie nodig is
-      const listKey = notification.notification.request.content.data?.listKey;
-      const shouldNavigate = listKey && listKey !== activeListKey;
-      if (shouldNavigate) {
-        router.push(`/lists/${listKey}`);
+      // Extract and guard the notification's listKey value
+      const listKeyParam =
+        notification.notification.request.content.data?.listKey;
+      if (typeof listKeyParam === "string" && listKeyParam !== activeListKey) {
+        router.replace(`/list/${listKeyParam}?notif=${tappedNotifId}`);
+        return; // stop further handling on the old list
       }
 
       if (tasks.length === 0 || !taskExists) {
@@ -410,10 +410,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         pending.notification.request.identifier
       )
     ) {
-      const notifId = pending.notification.request.identifier;
-      const taskExists = tasks.some((t) => t.notificationId === notifId);
+      const pushNotifId = pending.notification.request.identifier;
+      const taskExists = tasks.some((t) => t.notificationId === pushNotifId);
       if (taskExists) {
-        console.log("✅ Verwerk opgeslagen notificatie:", notifId);
+        console.log("✅ Verwerk opgeslagen notificatie:", pushNotifId);
         pendingNotificationRef.current = null;
         handleNotificationResponse(pending);
       } else {
@@ -530,7 +530,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         "🧭 Navigatie fallback: push naar lijst",
         listKeyFromNotification
       );
-      router.push(`/lists/${listKeyFromNotification}`);
+      router.replace(
+        `/list/${listKeyFromNotification}?notif=${response.notification.request.identifier}`
+      );
       return;
     }
     console.log("🔍 Op zoek naar taak met notificationId:", taskId);
@@ -740,8 +742,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       headerLeft: () => (
         <TouchableOpacity
           onPress={() => {
-            // If there's a previous screen, go back; otherwise navigate to home
-            if (router.canGoBack()) {
+            if (notif) {
+              // Als we via notificatie gekomen zijn, altijd terug naar home
+              router.replace("/");
+            } else if (router.canGoBack()) {
               router.back();
             } else {
               router.replace("/");
@@ -765,7 +769,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, theme.text, router]);
+  }, [navigation, theme.text, router, notif]);
 
   // Determine the active list, falling back to default lists if necessary
   const activeList =

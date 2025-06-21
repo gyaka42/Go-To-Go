@@ -58,10 +58,7 @@ function InnerLayout() {
           const notifId = notification.request.identifier;
           // Replace current route instead of pushing a new one,
           // so you don't get duplicate list screens in the history.
-          router.replace({
-            pathname: `/list/${listKey}`,
-            params: { notif: notifId },
-          });
+          router.replace(`/list/${listKey}?notif=${notifId}`);
         }
       });
 
@@ -135,6 +132,13 @@ function InnerLayout() {
       <Stack.Screen
         name="search"
         options={{ title: t("searchTitle"), headerBackVisible: false }}
+      />
+      <Stack.Screen
+        name="lists/[key]"
+        options={({ route }: any) => ({
+          title: route.params.key,
+          headerBackTitleVisible: true,
+        })}
       />
     </Stack>
   );
