@@ -33,5 +33,21 @@
   "further": "Devam",
   "placeHolder": "Örnek. Gökhan",
   "SetReminder": "Hatırlatıcı ayarla",
-  "list": "Liste"
+  "list": "Liste",
+  "noRepeat": "Tekrar yok",
+  "daily": "Günlük",
+  "weekly": "Haftalık",
+  "monthly": "Aylık",
+  "custom": "Özel",
+  "close": "Kapat",
+  "interval": "Hafta aralığı",
+  "mo": "Pzt",
+  "tu": "Sal",
+  "we": "Çar",
+  "th": "Per",
+  "fr": "Cum",
+  "sa": "Cmt",
+  "su": "Paz",
+  "cancel": "İptal",
+  "save": "Kaydet"
 }

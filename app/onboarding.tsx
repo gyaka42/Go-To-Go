@@ -1,5 +1,5 @@
 // app/onboarding.tsx
-import React, { useState, useContext } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,15 +12,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ThemeContext } from "../context/ThemeContext";
-import { useLanguage } from "../context/LanguageContext";
+import { useAppStore } from "../store/appStore";
 
 export default function Onboarding() {
-  const { t } = useLanguage();
+  const t = useAppStore((s) => s.t);
   const [name, setName] = useState("");
   const router = useRouter();
 
-  const { scheme } = useContext(ThemeContext);
+  const scheme = useAppStore((s) => s.scheme);
   const isDark = scheme === "dark";
   const theme = {
     wrapperBg: isDark ? "#1F2937" : "#F9FAFB",

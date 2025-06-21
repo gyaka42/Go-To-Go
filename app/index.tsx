@@ -2,7 +2,6 @@
 import React, {
   useState,
   useEffect,
-  useContext,
   useCallback,
   useLayoutEffect,
 } from "react";
@@ -15,6 +14,7 @@ import {
   StyleSheet,
   Modal,
 } from "react-native";
+
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
@@ -24,18 +24,19 @@ import * as ImagePicker from "expo-image-picker";
 import BottomBar from "../components/BottomBar";
 import Header from "../components/Header";
 import { useFocusEffect } from "@react-navigation/native";
-import { ListsContext, ListItem, Task } from "../context/ListsContext";
+import { ListItem, Task, useAppStore } from "../store/appStore";
 import { useBaseMenu } from "../utils/menuDefaults";
 import { MaterialIcons } from "@expo/vector-icons";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { ThemeContext } from "../context/ThemeContext";
-import { useLanguage } from "../context/LanguageContext";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { lists, setLists, tasksMap, setTasksMap } = useContext(ListsContext);
+  const lists = useAppStore((s) => s.lists);
+  const setLists = useAppStore((s) => s.setLists);
+  const tasksMap = useAppStore((s) => s.tasksMap);
+  const setTasksMap = useAppStore((s) => s.setTasksMap);
 
   const [order, setOrder] = useState<string[]>([]);
 
@@ -49,8 +50,12 @@ export default function HomeScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   const navigation = useNavigation();
-  const { mode, setMode, scheme } = useContext(ThemeContext);
-  const { lang, setLang, t } = useLanguage();
+  const mode = useAppStore((s) => s.mode);
+  const setMode = useAppStore((s) => s.setMode);
+  const scheme = useAppStore((s) => s.scheme);
+  const lang = useAppStore((s) => s.lang);
+  const setLang = useAppStore((s) => s.setLang);
+  const t = useAppStore((s) => s.t);
   const baseMenu = useBaseMenu();
   const combined = [...baseMenu, ...lists].map((item) => {
     const customTasks = tasksMap[item.key];
@@ -175,12 +180,10 @@ export default function HomeScreen() {
       }
     });
     // Remove the list and its tasks
-    setLists((prev) => prev.filter((l) => l.key !== key));
-    setTasksMap((prev) => {
-      const copy = { ...prev };
-      delete copy[key];
-      return copy;
-    });
+    setLists(lists.filter((l) => l.key !== key));
+    const newTasksMap = { ...tasksMap };
+    delete newTasksMap[key];
+    setTasksMap(newTasksMap);
   };
 
   // ──────────────────────────────────────────────────────

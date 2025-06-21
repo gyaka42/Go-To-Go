@@ -1,7 +1,7 @@
 // app/import.tsx
-import React, { useContext, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ListsContext, ListItem, Task } from "../context/ListsContext";
+import { ListItem, Task, useAppStore } from "../store/appStore";
 
 export default function ImportScreen() {
   // title en tasks komen uit de URL: gotogo://import?title=...&tasks=...
@@ -10,7 +10,10 @@ export default function ImportScreen() {
     tasks?: string;
   }>();
   const router = useRouter();
-  const { lists, setLists, tasksMap, setTasksMap } = useContext(ListsContext);
+  const lists = useAppStore((s) => s.lists);
+  const setLists = useAppStore((s) => s.setLists);
+  const tasksMap = useAppStore((s) => s.tasksMap);
+  const setTasksMap = useAppStore((s) => s.setTasksMap);
 
   useEffect(() => {
     if (title && tasks) {
@@ -29,9 +32,9 @@ export default function ImportScreen() {
           count: parsedTasks.length,
         };
         // Voeg de nieuwe lijst toe aan de bestaande lijsten
-        setLists((prev) => [...prev, newList]);
+        setLists([...lists, newList]);
         // Voeg de parsedTasks toe aan de tasksMap onder de nieuwe key
-        setTasksMap((prev) => ({ ...prev, [key]: parsedTasks }));
+        setTasksMap({ ...tasksMap, [key]: parsedTasks });
         // Navigeer naar de detailpagina van de nieuwe lijst
         router.replace(`/list/${key}`);
       } catch (error) {

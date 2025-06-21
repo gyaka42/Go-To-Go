@@ -1,5 +1,5 @@
 // app/search.tsx
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -11,11 +11,14 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ListsContext } from "../context/ListsContext";
+
+import { useNavigation } from "@react-navigation/native";
+import { TouchableOpacity as RNTouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
+import { useAppStore } from "../store/appStore";
 import { useBaseMenu } from "../utils/menuDefaults";
 import FilterBar from "../components/FilterBar";
-import { ThemeContext } from "../context/ThemeContext";
-import { useLanguage } from "../context/LanguageContext";
 
 interface SearchResult {
   id: string;
@@ -27,10 +30,30 @@ interface SearchResult {
 
 export default function SearchScreen() {
   const router = useRouter();
-  const { lists, tasksMap } = useContext(ListsContext);
+  const navigation = useNavigation();
+  const lists = useAppStore((s) => s.lists);
+  const tasksMap = useAppStore((s) => s.tasksMap);
   const baseMenu = useBaseMenu();
-  const { scheme } = useContext(ThemeContext);
-  const { t } = useLanguage();
+  const scheme = useAppStore((s) => s.scheme);
+  const t = useAppStore((s) => s.t);
+
+  // Add a back button in the header
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <RNTouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{ marginLeft: 16 }}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={scheme === "dark" ? "#FFF" : "#000"}
+          />
+        </RNTouchableOpacity>
+      ),
+    });
+  }, [navigation, scheme]);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);

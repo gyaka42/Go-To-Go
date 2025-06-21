@@ -33,5 +33,21 @@
   "further": "Continue",
   "placeHolder": "Example. Gökhan",
   "SetReminder": "Set Reminder",
-  "list": "List"
+  "list": "List",
+  "noRepeat": "No repeat",
+  "daily": "Daily",
+  "weekly": "Weekly",
+  "monthly": "Monthly",
+  "custom": "Custom",
+  "close": "Close",
+  "interval": "Week interval",
+  "mo": "Mo",
+  "tu": "Tu",
+  "we": "We",
+  "th": "Th",
+  "fr": "Fr",
+  "sa": "Sa",
+  "su": "Su",
+  "cancel": "Cancel",
+  "save": "Save"
 }

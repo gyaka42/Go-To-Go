@@ -3,7 +3,7 @@
     "name": "Go-To-Go",
     "slug": "todos-app",
     "assetBundlePatterns": ["assets/**/*"],
-    "version": "1.2.4",
+    "version": "1.2.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gogo22.todosapp",
-      "buildNumber": "6",
+      "buildNumber": "10",
       "icon": {
         "dark": "./assets/dark-icon.png",
         "light": "./assets/icon.png",
@@ -37,7 +37,7 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.gogo22.todosapp",
-      "versionCode": 6
+      "versionCode": 10
     },
     "notification": {
       "icon": "./assets/notification-icon.png",
@@ -63,6 +63,11 @@
       "expo-localization",
       "expo-mail-composer"
     ],
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "listUnknownPackages": false
+      }
+    },
     "extra": {
       "router": {},
       "eas": {

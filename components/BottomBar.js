@@ -1,5 +1,5 @@
 // components/BottomBar.js
-import React, { useContext } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -9,8 +9,7 @@ import {
   useColorScheme,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLanguage } from "..//context/LanguageContext";
-import { ThemeContext } from "../context/ThemeContext";
+import { useAppStore } from "../store/appStore";
 
 const getStyles = (scheme) =>
   StyleSheet.create({
@@ -45,8 +44,8 @@ const getStyles = (scheme) =>
   });
 
 export default function BottomBar({ onNewList }) {
-  const { lang, setLang, t } = useLanguage();
-  const { scheme } = useContext(ThemeContext);
+  const t = useAppStore((s) => s.t);
+  const scheme = useAppStore((s) => s.scheme);
   const styles = getStyles(scheme);
 
   return (
@@ -58,34 +57,3 @@ export default function BottomBar({ onNewList }) {
     </View>
   );
 }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     backgroundColor: "#FFF",
-//     borderRadius: 12,
-//     marginHorizontal: 16,
-//     marginBottom: 16,
-//     paddingVertical: 12,
-//     paddingHorizontal: 16,
-//     // iOS-schaduw
-//     shadowColor: "#000",
-//     shadowOpacity: 0.04,
-//     shadowRadius: 6,
-//     shadowOffset: { width: 0, height: 2 },
-//     // Android-elevation
-//     elevation: 2,
-//     flexDirection: "row",
-//     justifyContent: "center",
-//     alignItems: "center",
-//   },
-//   button: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//   },
-//   buttonText: {
-//     marginLeft: 8,
-//     fontSize: 16,
-//     fontWeight: "600",
-//     color: "#3B82F6",
-//   },
-// });

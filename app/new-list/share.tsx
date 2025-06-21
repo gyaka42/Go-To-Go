@@ -1,5 +1,5 @@
 import * as MailComposer from "expo-mail-composer";
-import React, { FC, useState, useContext } from "react";
+import React, { FC, useState } from "react";
 import {
   View,
   Text,
@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { ThemeContext } from "../../context/ThemeContext";
-import { useLanguage } from "../../context/LanguageContext";
+import { useAppStore } from "../../store/appStore";
 
 interface Props {
   listTitle: string;
@@ -19,8 +20,8 @@ interface Props {
 }
 
 const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
-  const { t } = useLanguage();
-  const { scheme } = useContext(ThemeContext);
+  const t = useAppStore((s) => s.t);
+  const scheme = useAppStore((s) => s.scheme);
   const iconColor = scheme === "dark" ? "#FFF" : "#000";
   const styles = getStyles(scheme);
   const [email, setEmail] = useState("");
@@ -63,7 +64,11 @@ const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 40 : 0}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>
           {t("shareList")} {listTitle}
@@ -89,7 +94,7 @@ const ShareModal: FC<Props> = ({ listTitle, tasks, onClose }) => {
           <Text style={styles.buttonText}>{t("send")}</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -98,11 +103,14 @@ export default ShareModal;
 const getStyles = (scheme: "light" | "dark" | null) =>
   StyleSheet.create({
     container: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
       backgroundColor: scheme === "dark" ? "#000" : "#FFF",
       paddingTop: 16,
       paddingBottom: 16,
       paddingHorizontal: 16,
-      margin: -16,
       borderTopLeftRadius: 12,
       borderTopRightRadius: 12,
       borderColor: scheme === "dark" ? "#000" : "#FFF",

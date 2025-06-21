@@ -1,8 +1,8 @@
-import React, { useContext } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { ThemeContext } from "../context/ThemeContext";
-import { useLanguage } from "../context/LanguageContext";
+
+import { useAppStore } from "../store/appStore";
 
 interface Props {
   onClose: () => void;
@@ -21,14 +21,14 @@ export default function OptionsSheet({
   onPrint,
   style,
 }: Props) {
-  const { scheme } = useContext(ThemeContext);
+  const scheme = useAppStore((s) => s.scheme);
 
   const isDark = scheme === "dark";
   const bgColor = isDark ? "#000" : "#FFF";
   const textColor = isDark ? "#FFF" : "#333";
   const iconColor = isDark ? "#FFF" : "#333";
 
-  const { t } = useLanguage();
+  const t = useAppStore((s) => s.t);
 
   return (
     <View style={[styles.sheet, style, { backgroundColor: bgColor }]}>

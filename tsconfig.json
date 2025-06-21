@@ -1,4 +1,17 @@
 {
-  "compilerOptions": {},
-  "extends": "expo/tsconfig.base"
+  "compilerOptions": {
+    "skipLibCheck": true
+  },
+  "extends": "expo/tsconfig.base",
+  "include": [
+    "declarations.d.ts",
+    "app/**/*",
+    "components/**/*",
+    "store/**/*",
+    "hooks/**/*",
+    "utils/**/*",
+    "context/**/*",
+    "nativewind-env.d.ts"
+  ],
+  "exclude": ["node_modules"]
 }

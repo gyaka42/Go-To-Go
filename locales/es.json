@@ -33,5 +33,21 @@
   "further": "Continuar",
   "placeHolder": "p. ej. Gökhan",
   "SetReminder": "Establecer recordatorio",
-  "list": "Lista"
+  "list": "Lista",
+  "noRepeat": "Sin repetición",
+  "daily": "Diario",
+  "weekly": "Semanal",
+  "monthly": "Mensual",
+  "custom": "Personalizado",
+  "close": "Cerrar",
+  "interval": "Intervalo semanal",
+  "mo": "Lu",
+  "tu": "Ma",
+  "we": "Mi",
+  "th": "Ju",
+  "fr": "Vi",
+  "sa": "Sa",
+  "su": "Do",
+  "cancel": "Cancelar",
+  "save": "Guardar"
 }

@@ -1,7 +1,8 @@
-import React, { useContext } from "react";
+import React from "react";
 import { View, Text, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { ThemeContext } from "../context/ThemeContext";
+
+import { useAppStore } from "../store/appStore";
 
 export default function Header({
   username,
@@ -9,7 +10,7 @@ export default function Header({
   onSearch,
   onAvatarPress,
 }) {
-  const { scheme } = useContext(ThemeContext);
+  const scheme = useAppStore((s) => s.scheme);
   const isDark = scheme === "dark";
 
   return (

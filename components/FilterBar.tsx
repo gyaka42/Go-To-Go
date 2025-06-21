@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { useLanguage } from "../context/LanguageContext";
+import React from "react";
+import { useAppStore } from "../store/appStore";
 import {
   View,
   TouchableOpacity,
@@ -8,7 +8,6 @@ import {
   ViewStyle,
   StyleProp,
 } from "react-native";
-import { ThemeContext } from "../context/ThemeContext";
 
 type Mode = "all" | "open" | "done";
 
@@ -19,8 +18,8 @@ interface Props {
 }
 
 export default function FilterBar({ mode, onChange, style }: Props) {
-  const { scheme } = useContext(ThemeContext);
-  const { t } = useLanguage();
+  const scheme = useAppStore((s) => s.scheme);
+  const t = useAppStore((s) => s.t);
 
   return (
     <View

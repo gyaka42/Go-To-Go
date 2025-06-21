@@ -1,21 +1,23 @@
 // app/_layout.tsx
-import React, { useEffect, useContext } from "react";
+import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
 import * as ImagePicker from "expo-image-picker";
-import { ThemeProvider, ThemeContext } from "../context/ThemeContext";
-import { ListsProvider } from "../context/ListsContext";
-import { LanguageProvider } from "../context/LanguageContext";
-import { useLanguage } from "../context/LanguageContext";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useAppStore } from "../store/appStore";
+import useInitializeApp from "../hooks/useInitializeApp";
+import { View, Text, Image } from "react-native";
+import logoOutline from "../assets/logo-outline.png";
 
 // Houd splash actief totdat we permissions geregeld hebben
 SplashScreen.preventAutoHideAsync();
 
 function InnerLayout() {
-  const { scheme } = useContext(ThemeContext);
-  const { t } = useLanguage();
+  useInitializeApp();
+  const scheme = useAppStore((s) => s.scheme);
+  const t = useAppStore((s) => s.t);
   const router = useRouter();
 
   useEffect(() => {
@@ -37,16 +39,29 @@ function InnerLayout() {
         }),
       });
 
-      // Handle taps on scheduled notifications
+      // Handle taps on scheduled notifications with robust logging
       Notifications.addNotificationResponseReceivedListener((response) => {
-        const { listKey } = response.notification.request.content.data;
+        console.log(
+          "🔔 Notificatie response ontvangen:",
+          JSON.stringify(response, null, 2)
+        );
+
+        const { notification } = response;
+        const { title, body, data } = notification.request.content;
+
+        console.log("🔔 Titel:", title);
+        console.log("🔔 Body:", body);
+        console.log("🔔 Data:", data);
+
+        const { listKey } = data;
         if (listKey) {
-          // Pop all the way back to the root screen
-          while (router.canGoBack()) {
-            router.back();
-          }
-          // Then navigate to the specific list
-          router.push(`/list/${listKey}`);
+          const notifId = notification.request.identifier;
+          // Replace current route instead of pushing a new one,
+          // so you don't get duplicate list screens in the history.
+          router.replace({
+            pathname: `/list/${listKey}`,
+            params: { notif: notifId },
+          });
         }
       });
 
@@ -84,24 +99,55 @@ function InnerLayout() {
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen
         name="index"
-        options={{ title: t("homeTitle"), headerTitleAlign: "center" }}
+        options={{
+          headerTitle: () => (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Image
+                source={logoOutline}
+                style={{
+                  width: 30,
+                  height: 30,
+                  backgroundColor: "transparent",
+                  tintColor: scheme === "dark" ? "#FDA4AF" : "#000",
+                  marginRight: 6,
+                  resizeMode: "contain",
+                }}
+              />
+              <Text
+                style={{
+                  fontSize: 22,
+                  fontWeight: "700",
+                  color: scheme === "dark" ? "#FFF" : "#000",
+                  letterSpacing: 1.5,
+                }}
+              >
+                {t("homeTitle")}
+              </Text>
+            </View>
+          ),
+          headerTitleAlign: "center",
+        }}
       />
-      <Stack.Screen name="new-list" options={{ title: t("newListTitle") }} />
-      <Stack.Screen name="search" options={{ title: t("searchTitle") }} />
+      <Stack.Screen
+        name="new-list"
+        options={{ title: t("newListTitle"), headerBackVisible: false }}
+      />
+      <Stack.Screen
+        name="search"
+        options={{ title: t("searchTitle"), headerBackVisible: false }}
+      />
     </Stack>
   );
 }
 
+const queryClient = new QueryClient();
+
 export default function Layout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <LanguageProvider>
-          <ListsProvider>
-            <InnerLayout />
-          </ListsProvider>
-        </LanguageProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <InnerLayout />
+      </QueryClientProvider>
     </GestureHandlerRootView>
   );
 }
