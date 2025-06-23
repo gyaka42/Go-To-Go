@@ -46,6 +46,15 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { Task, useAppStore } from "../store/appStore"; // Task interface includes notificationId
+import * as Haptics from "expo-haptics";
+import Animated, {
+  FadeOut,
+  Layout,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+  withSequence,
+} from "react-native-reanimated";
 import * as Print from "expo-print";
 import useTasks from "../hooks/useTasks";
 import FilterBar from "../components/FilterBar";
@@ -744,11 +753,11 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           onPress={() => {
             if (notif) {
               // Als we via notificatie gekomen zijn, altijd terug naar home
-              router.replace("/");
+              router.push("/");
             } else if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace("/");
+              router.push("/");
             }
           }}
           style={{ marginLeft: 16 }}
@@ -904,6 +913,26 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   // Render task
   const renderTask = (params: RenderItemParams<Task>) => {
     const { item, drag, isActive } = params;
+    // --- All hooks called at the top, unconditionally and in the same order ---
+    const checkboxScale = useSharedValue(1);
+    const animatedCheckboxStyle = useAnimatedStyle(() => ({
+      transform: [{ scale: checkboxScale.value }],
+    }));
+
+    const opacity = useSharedValue(1);
+    const scale = useSharedValue(1);
+
+    useEffect(() => {
+      opacity.value = withTiming(item.done ? 0.5 : 1, { duration: 300 });
+      scale.value = withTiming(item.done ? 0.95 : 1, { duration: 300 });
+    }, [item.done]);
+
+    const animatedStyle = useAnimatedStyle(() => ({
+      opacity: opacity.value,
+      transform: [{ scale: scale.value }],
+    }));
+    // --- End hooks ---
+
     const idx = tasks.findIndex((t) => t.id === item.id);
     // Highlight only if task has dueDate or recurrence
     const hasDateOrRecurrence =
@@ -924,6 +953,15 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       : "";
     const recurrenceLabel = getRecurrenceLabel(item.recurrence, t);
 
+    const onToggle = () => {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      checkboxScale.value = withSequence(
+        withTiming(1.2, { duration: 100 }),
+        withTiming(1, { duration: 100 })
+      );
+      toggleTask(item.id);
+    };
+
     const notify = async () => {
       await Notifications.scheduleNotificationAsync({
         content: {
@@ -941,161 +979,174 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     };
 
     return (
-      <TouchableOpacity
-        style={[
-          styles.taskCard,
-          { backgroundColor: isHighlighted ? "#FEF3C7" : theme.cardBackground },
-        ]}
+      <Animated.View
+        layout={Layout.springify()}
+        exiting={FadeOut.duration(300)}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 1,
-            marginLeft: -8,
-            marginRight: 4,
-          }}
-        >
-          <Pressable onLongPress={drag} style={{ padding: 4 }} hitSlop={8}>
-            <MaterialCommunityIcons
-              name="drag"
-              size={20}
-              color={theme.secondaryText}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => toggleTask(item.id)}
-            style={{ padding: 4 }}
-            hitSlop={8}
-          >
-            <MaterialCommunityIcons
-              name={
-                item.done
-                  ? "checkbox-marked-circle"
-                  : "checkbox-blank-circle-outline"
-              }
-              size={24}
-              color={item.done ? "#10B981" : theme.secondaryText}
-            />
-          </Pressable>
-        </View>
-        {editingId === item.id ? (
-          <TextInput
-            value={editingText}
-            onChangeText={setEditingText}
-            onBlur={() => {
-              // Persist edited title
-              setTasks((old) =>
-                old.map((t) =>
-                  t.id === editingId ? { ...t, title: editingText } : t
-                )
-              );
-              // Exit edit mode
-              setEditingId(null);
-              // Scroll back to edited item
-              setTimeout(() => {
-                if (flatListRef.current) {
-                  flatListRef.current.scrollToIndex({
-                    index: idx,
-                    animated: true,
-                    viewPosition: 0.5,
-                  });
-                }
-                editingTaskRef.current = null;
-              }, 100);
-            }}
-            onFocus={() => {
-              console.log(
-                "[TextInput onFocus] current scrollOffsetRef:",
-                scrollOffsetRef.current,
-                "keyboardHeight:",
-                keyboardHeight,
-                "editing item index:",
-                idx
-              );
-              setShowDatePicker(false);
-              setDatePickerFor(null);
-              // Save scroll position before editing
-              editScrollPositionRef.current = scrollOffsetRef.current;
-              // scroll this item up above the keyboard with extra margin
-              const extraOffset = keyboardHeight + 20; // add small margin above keyboard
-              if (flatListRef.current) {
-                flatListRef.current.scrollToIndex({
-                  index: idx,
-                  animated: true,
-                  viewPosition: 0,
-                  viewOffset: extraOffset,
-                });
-              }
-              // Mark editingTaskRef as editing this task
-              editingTaskRef.current = item.id;
-              setEditingId(item.id);
-              setEditingText(item.title);
-            }}
+        <View>
+          <Animated.View
             style={[
-              styles.input,
+              styles.taskCard,
               {
-                color: theme.text,
-                borderColor: theme.placeholder,
-                marginRight: 8,
+                backgroundColor: isHighlighted
+                  ? "#FEF3C7"
+                  : theme.cardBackground,
               },
+              animatedStyle, // animatedStyle bevat opacity en scale, alleen hier toepassen
             ]}
-            autoFocus
-          />
-        ) : (
-          <Pressable
-            onPress={() => {
-              setShowDatePicker(false);
-              setDatePickerFor(null);
-              // Mark editingTaskRef as editing this task
-              editingTaskRef.current = item.id;
-              setEditingId(item.id);
-              setEditingText(item.title);
-            }}
-            style={{ flex: 1 }}
           >
-            <Text
-              style={[
-                styles.rowText,
-                item.done ? styles.rowDone : {},
-                { color: theme.text },
-              ]}
-            >
-              {item.title}
-            </Text>
-          </Pressable>
-        )}
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {(dueDateLabel || recurrenceLabel) && (
-            <TouchableOpacity
-              onPress={() => {
-                Keyboard.dismiss();
-                setDatePickerFor(item.id);
-                setSelectedTask(item);
-                if (Platform.OS === "android") {
-                  DateTimePickerAndroid.open({
-                    value: item.dueDate || new Date(),
-                    onChange: onChangeDate,
-                    mode: "date",
-                    is24Hour: true,
-                  });
-                } else {
-                  setShowDatePicker(true);
-                }
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 1,
+                marginLeft: -8,
+                marginRight: 4,
               }}
-              style={{ marginRight: 8 }}
             >
-              <Ionicons name="calendar-outline" size={20} color="#2563EB" />
-              <Text style={{ color: theme.secondaryText, fontSize: 12 }}>
-                {dueDateLabel} {recurrenceLabel ? `· ${recurrenceLabel}` : ""}
-              </Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={() => deleteTask(item.id)}>
-            <Text style={styles.deleteX}>×</Text>
-          </TouchableOpacity>
+              <Pressable onLongPress={drag} style={{ padding: 4 }} hitSlop={8}>
+                <MaterialCommunityIcons
+                  name="drag"
+                  size={20}
+                  color={theme.secondaryText}
+                />
+              </Pressable>
+              <Pressable onPress={onToggle} style={{ padding: 4 }} hitSlop={8}>
+                <Animated.View>
+                  <Animated.View style={animatedCheckboxStyle}>
+                    <MaterialCommunityIcons
+                      name={
+                        item.done
+                          ? "checkbox-marked-circle"
+                          : "checkbox-blank-circle-outline"
+                      }
+                      size={24}
+                      color={item.done ? "#10B981" : theme.secondaryText}
+                    />
+                  </Animated.View>
+                </Animated.View>
+              </Pressable>
+            </View>
+            {editingId === item.id ? (
+              <TextInput
+                value={editingText}
+                onChangeText={setEditingText}
+                onBlur={() => {
+                  // Persist edited title
+                  setTasks((old) =>
+                    old.map((t) =>
+                      t.id === editingId ? { ...t, title: editingText } : t
+                    )
+                  );
+                  // Exit edit mode
+                  setEditingId(null);
+                  // Scroll back to edited item
+                  setTimeout(() => {
+                    if (flatListRef.current) {
+                      flatListRef.current.scrollToIndex({
+                        index: idx,
+                        animated: true,
+                        viewPosition: 0.5,
+                      });
+                    }
+                    editingTaskRef.current = null;
+                  }, 100);
+                }}
+                onFocus={() => {
+                  console.log(
+                    "[TextInput onFocus] current scrollOffsetRef:",
+                    scrollOffsetRef.current,
+                    "keyboardHeight:",
+                    keyboardHeight,
+                    "editing item index:",
+                    idx
+                  );
+                  setShowDatePicker(false);
+                  setDatePickerFor(null);
+                  // Save scroll position before editing
+                  editScrollPositionRef.current = scrollOffsetRef.current;
+                  // scroll this item up above the keyboard with extra margin
+                  const extraOffset = keyboardHeight + 20; // add small margin above keyboard
+                  if (flatListRef.current) {
+                    flatListRef.current.scrollToIndex({
+                      index: idx,
+                      animated: true,
+                      viewPosition: 0,
+                      viewOffset: extraOffset,
+                    });
+                  }
+                  // Mark editingTaskRef as editing this task
+                  editingTaskRef.current = item.id;
+                  setEditingId(item.id);
+                  setEditingText(item.title);
+                }}
+                style={[
+                  styles.input,
+                  {
+                    color: theme.text,
+                    borderColor: theme.placeholder,
+                    marginRight: 8,
+                  },
+                ]}
+                autoFocus
+              />
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setShowDatePicker(false);
+                  setDatePickerFor(null);
+                  // Mark editingTaskRef as editing this task
+                  editingTaskRef.current = item.id;
+                  setEditingId(item.id);
+                  setEditingText(item.title);
+                }}
+                style={{ flex: 1 }}
+              >
+                <Text
+                  style={[
+                    styles.rowText,
+                    item.done ? styles.rowDone : {},
+                    { color: theme.text },
+                  ]}
+                >
+                  {item.title}
+                </Text>
+              </Pressable>
+            )}
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {(dueDateLabel || recurrenceLabel) && (
+                <TouchableOpacity
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setDatePickerFor(item.id);
+                    setSelectedTask(item);
+                    if (Platform.OS === "android") {
+                      DateTimePickerAndroid.open({
+                        value: item.dueDate || new Date(),
+                        onChange: onChangeDate,
+                        mode: "date",
+                        is24Hour: true,
+                      });
+                    } else {
+                      setShowDatePicker(true);
+                    }
+                  }}
+                  style={{ marginRight: 8 }}
+                >
+                  <Ionicons name="calendar-outline" size={20} color="#2563EB" />
+                  <Text style={{ color: theme.secondaryText, fontSize: 12 }}>
+                    {dueDateLabel}{" "}
+                    {recurrenceLabel ? `· ${recurrenceLabel}` : ""}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => deleteTask(item.id)}>
+                <Text style={styles.deleteX}>×</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
         </View>
-      </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -1122,7 +1173,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     <KeyboardAvoidingView
       behavior="padding"
       keyboardVerticalOffset={Platform.OS === "ios" ? 100 : 0}
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: theme.background }}
     >
       <SafeAreaView
         style={[styles.container, { backgroundColor: theme.background }]}
@@ -1358,10 +1409,11 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             ref={flatListRef}
             data={visibleTasks}
             extraData={highlightedTaskId}
-            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             renderItem={renderTask}
             keyExtractor={(item) => item.id.toString()}
             onDragEnd={({ data }) => setTasks(data)}
+            autoscrollThreshold={80}
+            autoscrollSpeed={50}
             activationDistance={0}
             keyboardShouldPersistTaps="handled"
             scrollEventThrottle={16}
@@ -1477,18 +1529,26 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         </Modal>
 
         <Modal visible={showShareModal} transparent animationType="slide">
-          <View style={styles.modal}>
-            <TouchableWithoutFeedback onPress={() => setShowShareModal(false)}>
-              <View style={StyleSheet.absoluteFill} />
-            </TouchableWithoutFeedback>
-            <View style={styles.sheet}>
-              <ShareModal
-                listTitle={mode === "edit" ? activeList?.label || "" : title}
-                tasks={tasks}
-                onClose={() => setShowShareModal(false)}
-              />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+          >
+            <View style={styles.modal}>
+              <TouchableWithoutFeedback
+                onPress={() => setShowShareModal(false)}
+              >
+                <View style={StyleSheet.absoluteFill} />
+              </TouchableWithoutFeedback>
+              <View style={styles.sheet}>
+                <ShareModal
+                  listTitle={mode === "edit" ? activeList?.label || "" : title}
+                  tasks={tasks}
+                  onClose={() => setShowShareModal(false)}
+                />
+              </View>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -1620,14 +1680,14 @@ const styles = StyleSheet.create({
   },
   datePickerWrapper: {
     alignItems: "center",
-    marginTop: -8,
-    marginBottom: -2,
+    marginTop: -10,
+    marginBottom: -6,
     width: "100%",
     paddingHorizontal: 16,
   },
   dateDoneButton: {
-    marginTop: -8,
-    marginBottom: 12,
+    marginTop: -10,
+    marginBottom: 10,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,

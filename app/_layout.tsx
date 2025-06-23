@@ -123,6 +123,7 @@ function InnerLayout() {
             </View>
           ),
           headerTitleAlign: "center",
+          headerBackVisible: false,
         }}
       />
       <Stack.Screen
@@ -134,7 +135,7 @@ function InnerLayout() {
         options={{ title: t("searchTitle"), headerBackVisible: false }}
       />
       <Stack.Screen
-        name="lists/[key]"
+        name="list/[key]"
         options={({ route }: any) => ({
           title: route.params.key,
           headerBackTitleVisible: true,
