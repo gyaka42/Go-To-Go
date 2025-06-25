@@ -25,9 +25,8 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
-import DateTimePicker, {
-  DateTimePickerAndroid,
-} from "@react-native-community/datetimepicker";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import DateTimePickerModal from "react-native-modal-datetime-picker";
 import * as Notifications from "expo-notifications";
 // Set global notification handler
 Notifications.setNotificationHandler({
@@ -45,7 +44,21 @@ import { useNavigation } from "@react-navigation/native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { Task, useAppStore } from "../store/appStore"; // Task interface includes notificationId
+import { Task, useAppStore } from '../store/appStore';
+// Wait for a list key to appear in Zustand store
+function waitForListKey(key: string, timeout = 200): Promise<void> {
+  return new Promise((resolve) => {
+    const check = () => {
+      const exists = useAppStore.getState().lists.some((l) => l.key === key);
+      if (exists) {
+        resolve();
+      } else {
+        setTimeout(check, timeout);
+      }
+    };
+    check();
+  });
+}
 import * as Haptics from "expo-haptics";
 import Animated, {
   FadeOut,
@@ -101,6 +114,44 @@ interface Props {
 }
 
 export default function ListEditor({ mode, listKey, titleLabel }: Props) {
+  // --- Custom states for DateTimePickerModal (for editing existing tasks) ---
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // State for new task due date when creating new task
+  const [newTaskDueDate, setNewTaskDueDate] = useState<Date | null>(null);
+
+  // Function to update the dueDate of a task by id
+  const updateTaskDueDate = (taskId: string, date: Date) => {
+    setTasks((prevTasks) =>
+      prevTasks.map((t) =>
+        t.id === taskId
+          ? {
+              ...t,
+              dueDate: date,
+            }
+          : t
+      )
+    );
+    // Also update selectedTask if it matches
+    setSelectedTask((prev) =>
+      prev && prev.id === taskId ? { ...prev, dueDate: date } : prev
+    );
+  };
+  
+
+  // Handler for DateTimePickerModal confirm (for editing existing tasks or new task)
+  const [draftTask, setDraftTask] = useState<{ dueDate?: Date } | null>(null);
+  const handleConfirm = (date: Date) => {
+    setDueDate(date); // laat deze staan als je wil dat het huidige inputveld visueel update
+    setShowDatePickerModal(false);
+
+    if (selectedTask) {
+      const updatedTasks = tasks.map((t) =>
+        t.id === selectedTask.id ? { ...t, dueDate: date } : t
+      );
+      setTasks(updatedTasks);
+    }
+  };
   // Highlight/scroll feature: flatListRef and highlight state
   const flatListRef = useRef<any>(null);
   // Ref to track if a task edit is active (used for keyboard scroll restore logic)
@@ -181,8 +232,6 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const [recurrence, setRecurrence] = useState<
     Partial<RRuleOptions> | undefined
   >(undefined);
-  // Added: State for selected task (for date picker, etc.)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   // Pending trigger state for notification
   const [pendingTrigger, setPendingTrigger] = useState(0);
 
@@ -201,15 +250,27 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 
   // DatePicker state
   const [datePickerFor, setDatePickerFor] = useState<string | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  // iOS Date/Time temporary states
+  // react-native-modal-datetime-picker state for new task
+  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
+  // iOS Date/Time temporary states (used only for legacy inline picker, can be removed if fully migrated)
   const [iosDate, setIosDate] = useState<Date | null>(null);
   const [iosTime, setIosTime] = useState<Date | null>(null);
+  // Show/hide for iOS inline picker and task edit date
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  // Modal Date Picker Handlers for new task
+  const hideDatePicker = () => setShowDatePickerModal(false);
 
   // Options sheet / share modal
   const [showOptions, setShowOptions] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Handler voor kalenderknop bij nieuwe taak
+  const handleNewTaskCalendarPress = () => {
+    setSelectedTask(null);
+    setNewTaskDueDate(new Date());
+    setShowDatePickerModal(true);
+  };
 
   // For edit mode, get list key from params if not provided
   const { key, notif } = useLocalSearchParams<{
@@ -566,6 +627,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         "📦 [ScrollTest] Zichtbare taken:",
         visibleTasks.map((t) => ({ id: t.id, title: t.title }))
       );
+      
       const index = visibleTasks.findIndex((t) => t.id === task.id);
       console.log("📍 Index van taak om naartoe te scrollen:", index);
       if (index !== -1 && flatListRef.current) {
@@ -673,7 +735,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   // Persist new list and its tasks when leaving in create mode
   useEffect(() => {
     if (mode === "create") {
-      const unsubscribe = navigation.addListener("beforeRemove", () => {
+      const unsubscribe = navigation.addListener("beforeRemove", async () => {
         const label = title.trim() || t("NamelesList");
         const key = newListKeyRef.current;
         // Add the new list item
@@ -683,6 +745,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         ]);
         // Store its tasks
         setTasksMap({ ...tasksMap, [key]: tasks });
+        // Wait for Zustand to have the list available
+        await waitForListKey(key);
       });
       return unsubscribe;
     }
@@ -697,50 +761,69 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const hookAddTask = async () => {
     if (newTask.trim() === "") return;
 
-    if (recurrence && !dueDate) {
+    if (recurrence && !dueDate && !newTaskDueDate) {
       Alert.alert(t("error"), t("recurrenceNeedsDate"));
       return;
     }
 
-    // Zorg ervoor dat notificationId wordt meegegeven aan createdTask als property.
-    const createdTask = await addTask(
-      newTask,
-      dueDate,
-      activeListKey || "",
-      recurrence
-    );
+    // --- Toegevoegd: addTaskSafely met delay indien nieuwe lijst ---
+    const isNewlyCreatedList = !useAppStore.getState().findListLabel?.(activeListKey || "");
 
-    // Als createdTask.notificationId ontbreekt, probeer het alsnog op te halen
-    // (Dit hangt af van de implementatie van addTask; als die het niet toevoegt, moet het daar gefixt worden.)
-    // Hier alleen een check.
-    if (createdTask && !("notificationId" in createdTask)) {
-      createdTask.notificationId = null;
-    }
-
-    Keyboard.dismiss();
-    setNewTask("");
-    setDueDate(null);
-    setRecurrence(undefined);
-    if (
-      createdTask &&
-      (createdTask.dueDate ||
-        (createdTask.recurrence &&
-          Object.keys(createdTask.recurrence).length > 0))
-    ) {
-      const index = tasks.length;
-      flatListRef.current?.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0.5,
-      });
-      setHighlightedTaskId(createdTask.id);
-      console.log(
-        "🆕 Nieuw toegevoegde taak scrollen en highlighten:",
-        createdTask.id
+    const addTaskSafely = async () => {
+      // Als het een net aangemaakte lijst is, wacht tot deze beschikbaar is in Zustand
+      if (isNewlyCreatedList && mode === "create") {
+        await waitForListKey(newListKeyRef.current);
+      }
+      const listKeyToUse = mode === "create" ? newListKeyRef.current : (activeListKey || "");
+      const createdTask = await addTask(
+        newTask,
+        selectedTask && selectedTask.dueDate !== undefined
+          ? selectedTask.dueDate
+          : dueDate ?? newTaskDueDate ?? null,
+        listKeyToUse,
+        recurrence
       );
-      setTimeout(() => {
-        setHighlightedTaskId(null);
-      }, 3000);
+      setDueDate(null); // resetten na aanmaken is goed
+      setNewTaskDueDate(null);
+
+      if (createdTask && !("notificationId" in createdTask)) {
+        createdTask.notificationId = null;
+      }
+
+      Keyboard.dismiss();
+      setNewTask("");
+      setDueDate(null);
+      setRecurrence(undefined);
+      setDraftTask(null);
+      setNewTaskDueDate(null);
+      if (
+        createdTask &&
+        (createdTask.dueDate ||
+          (createdTask.recurrence &&
+            Object.keys(createdTask.recurrence).length > 0))
+      ) {
+        const index = tasks.length;
+        flatListRef.current?.scrollToIndex({
+          index,
+          animated: true,
+          viewPosition: 0.5,
+        });
+        setHighlightedTaskId(createdTask.id);
+        console.log(
+          "🆕 Nieuw toegevoegde taak scrollen en highlighten:",
+          createdTask.id
+        );
+        setTimeout(() => {
+          setHighlightedTaskId(null);
+        }, 3000);
+      }
+    };
+
+    if (isNewlyCreatedList) {
+      // De wachtlogica zit nu in addTaskSafely
+      await addTaskSafely();
+    } else {
+      await addTaskSafely();
     }
   };
 
@@ -1117,19 +1200,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
               {(dueDateLabel || recurrenceLabel) && (
                 <TouchableOpacity
                   onPress={() => {
-                    Keyboard.dismiss();
-                    setDatePickerFor(item.id);
+                    // Open the new DateTimePickerModal for editing this task's date
                     setSelectedTask(item);
-                    if (Platform.OS === "android") {
-                      DateTimePickerAndroid.open({
-                        value: item.dueDate || new Date(),
-                        onChange: onChangeDate,
-                        mode: "date",
-                        is24Hour: true,
-                      });
-                    } else {
-                      setShowDatePicker(true);
-                    }
+                    setShowDatePickerModal(true);
                   }}
                   style={{ marginRight: 8 }}
                 >
@@ -1229,46 +1302,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         <View
           style={[styles.inputCard, { backgroundColor: theme.cardBackground }]}
         >
+          {/* Kalenderknop voor nieuwe taak aanmaken met aangepaste handler */}
           <TouchableOpacity
-            onPress={() => {
-              Keyboard.dismiss();
-              if (datePickerFor === "new") {
-                setShowDatePicker(false);
-                setDatePickerFor(null);
-                return;
-              }
-              setDatePickerFor("new");
-              if (Platform.OS === "android") {
-                // First pick date
-                DateTimePickerAndroid.open({
-                  value: dueDate || new Date(),
-                  mode: "date",
-                  is24Hour: true,
-                  onChange: (event, selectedDate) => {
-                    if (event.type === "set" && selectedDate) {
-                      // Then pick time
-                      DateTimePickerAndroid.open({
-                        value: selectedDate,
-                        mode: "time",
-                        is24Hour: true,
-                        onChange: (evt2, selectedTime) => {
-                          if (evt2.type === "set" && selectedTime) {
-                            const combined = new Date(selectedDate);
-                            combined.setHours(
-                              selectedTime.getHours(),
-                              selectedTime.getMinutes()
-                            );
-                            setDueDate(combined);
-                          }
-                        },
-                      });
-                    }
-                  },
-                });
-              } else {
-                setShowDatePicker(true);
-              }
-            }}
+            onPress={handleNewTaskCalendarPress}
             style={styles.iconButton}
           >
             <Ionicons name="calendar-outline" size={24} color="#2563EB" />
@@ -1550,8 +1586,24 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             </View>
           </KeyboardAvoidingView>
         </Modal>
-      </SafeAreaView>
-    </KeyboardAvoidingView>
+      {/* iOS DateTimePickerModal for editing or creating a task's due date */}
+      {Platform.OS === 'ios' && showDatePickerModal && (
+        <DateTimePickerModal
+          isVisible={showDatePickerModal}
+          mode="datetime"
+          date={
+            selectedTask?.dueDate
+              ? new Date(selectedTask.dueDate)
+              : newTaskDueDate ?? new Date()
+          }
+          display="inline"
+          onConfirm={handleConfirm}
+          onCancel={() => setShowDatePickerModal(false)}
+          is24Hour={true}
+        />
+      )}
+    </SafeAreaView>
+  </KeyboardAvoidingView>
   );
 }
 
@@ -1699,3 +1751,4 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
+

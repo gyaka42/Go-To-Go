@@ -57,14 +57,17 @@ export default function HomeScreen() {
   const setLang = useAppStore((s) => s.setLang);
   const t = useAppStore((s) => s.t);
   const baseMenu = useBaseMenu();
-  const combined = [...baseMenu, ...lists].map((item) => {
+  const combined = [
+    ...baseMenu,
+    ...lists.filter((l) => !baseMenu.some((b) => b.key === l.key)),
+  ].map((item) => {
     const customTasks = tasksMap[item.key];
     return {
       ...item,
       count:
         customTasks !== undefined
           ? customTasks.length
-          : counts[item.key] ?? null,
+          : (counts[item.key] ?? null),
     };
   });
 
@@ -96,8 +99,8 @@ export default function HomeScreen() {
                   (mode === "system"
                     ? "light"
                     : mode === "light"
-                    ? "dark"
-                    : "system") as any
+                      ? "dark"
+                      : "system") as any
                 )
               }
               style={{ marginRight: 16 }}
@@ -108,8 +111,8 @@ export default function HomeScreen() {
                   mode === "dark"
                     ? "dark-mode"
                     : mode === "light"
-                    ? "light-mode"
-                    : "settings"
+                      ? "light-mode"
+                      : "settings"
                 }
                 size={24}
                 color={scheme === "dark" ? "#FFF" : "#000"}
@@ -179,11 +182,9 @@ export default function HomeScreen() {
         Notifications.cancelScheduledNotificationAsync(t.notificationId);
       }
     });
-    // Remove the list and its tasks
-    setLists(lists.filter((l) => l.key !== key));
-    const newTasksMap = { ...tasksMap };
-    delete newTasksMap[key];
-    setTasksMap(newTasksMap);
+
+    // Remove the list and its tasks via the store's removeList method
+    useAppStore.getState().removeList(key);
   };
 
   // ──────────────────────────────────────────────────────
@@ -267,7 +268,7 @@ export default function HomeScreen() {
           AsyncStorage.setItem("list_order", JSON.stringify(newOrder));
         }}
         renderItem={({ item, drag, isActive }: RenderItemParams<ListItem>) => {
-          const isCustom = lists.some((l) => l.key === item.key);
+          const isCustom = !baseMenu.some((b) => b.key === item.key);
           return (
             <TouchableOpacity
               style={[
@@ -371,14 +372,14 @@ export default function HomeScreen() {
                   {code === "nl"
                     ? "🇳🇱"
                     : code === "en"
-                    ? "🇬🇧"
-                    : code === "tr"
-                    ? "🇹🇷"
-                    : code === "de"
-                    ? "🇩🇪"
-                    : code === "es"
-                    ? "🇪🇸"
-                    : "🇫🇷"}
+                      ? "🇬🇧"
+                      : code === "tr"
+                        ? "🇹🇷"
+                        : code === "de"
+                          ? "🇩🇪"
+                          : code === "es"
+                            ? "🇪🇸"
+                            : "🇫🇷"}
                 </Text>
                 <Text style={{ color: scheme === "dark" ? "#FFF" : "#000" }}>
                   {code.toUpperCase()}

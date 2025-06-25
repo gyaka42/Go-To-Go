@@ -1,7 +1,7 @@
 import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
-import { Task } from "../store/appStore";
+import { Task, useAppStore } from "../store/appStore";
 import { RRule, Options as RRuleOptions } from "rrule";
 
 export default function useTasks(
@@ -18,11 +18,16 @@ export default function useTasks(
     ): Promise<string | undefined> => {
       const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
       if (seconds <= 0) return;
+
+      // ✅ lijstnaam ophalen voor body
+      const listLabel =
+        useAppStore.getState().findListLabel?.(listKey) ?? "onbekende lijst";
+
       try {
         const identifier = await Notifications.scheduleNotificationAsync({
           content: {
             title: "Taakherinnering",
-            body: title,
+            body: `Herinnering voor "${title}" in lijst "${listLabel}"`,
             sound: "default",
             data: { listKey },
           },
@@ -78,7 +83,7 @@ export default function useTasks(
         notificationId,
         titleEditable: true,
         recurrence,
-        // highlight is optional on Task type, but set here for consistency
+        listKey: listKey ?? "", // fallback to empty string if undefined
         ...(dueDate || recurrence ? { highlight: true } : {}),
       };
       console.log("🆔 Nieuwe taak-ID:", task.id);

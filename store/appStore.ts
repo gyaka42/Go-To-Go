@@ -21,6 +21,7 @@ export interface Task {
   notificationId?: string;
   titleEditable: boolean;
   recurrence?: Partial<RRuleOptions>;
+  listKey: string;
 }
 
 export interface ListItem {
@@ -47,6 +48,8 @@ interface AppState {
   setLang: (lang: Lang) => void;
   setPendingNotificationId: (id: string | null) => void;
   t: (key: string, vars?: Record<string, string>) => string;
+  findListLabel: (key: string) => string;
+  removeList: (key: string) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -58,8 +61,11 @@ export const useAppStore = create<AppState>()(
       scheme: Appearance.getColorScheme() || "light",
       lang: "nl",
       pendingNotificationId: null,
-      setLists: (lists) => {
-        set({ lists });
+      setLists: (newLists) => {
+        const current = get().lists;
+        const combined = [...current, ...newLists];
+        const unique = [...new Map(combined.map((l) => [l.key, l])).values()];
+        set({ lists: unique });
       },
       setTasksMap: (map) => {
         set({ tasksMap: map });
@@ -84,6 +90,17 @@ export const useAppStore = create<AppState>()(
         }
         return str;
       },
+      findListLabel: (key: string) => {
+        const list = get().lists.find((l) => l.key === key);
+        return list?.label ?? "Unknown list";
+      },
+      removeList: (key) => {
+        const currentLists = get().lists;
+        const updatedLists = currentLists.filter((l) => l.key !== key);
+        const currentTasksMap = get().tasksMap;
+        const { [key]: removedTasks, ...restTasksMap } = currentTasksMap;
+        set({ lists: updatedLists, tasksMap: restTasksMap });
+      },
     }),
     {
       name: "app_store", // naam in AsyncStorage
@@ -93,6 +110,7 @@ export const useAppStore = create<AppState>()(
         tasksMap: state.tasksMap,
         mode: state.mode,
         lang: state.lang,
+        pendingNotificationId: state.pendingNotificationId,
       }),
     }
   )
