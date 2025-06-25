@@ -45,6 +45,12 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { Task, useAppStore } from '../store/appStore';
+
+// Random color generator for new lists
+const randomColor = () => {
+  const colors = ['#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6'];
+  return colors[Math.floor(Math.random() * colors.length)];
+};
 // Wait for a list key to appear in Zustand store
 function waitForListKey(key: string, timeout = 200): Promise<void> {
   return new Promise((resolve) => {
@@ -114,6 +120,8 @@ interface Props {
 }
 
 export default function ListEditor({ mode, listKey, titleLabel }: Props) {
+  // Get setActiveListKey from store
+  const setActiveListKey = useAppStore((s) => s.setActiveListKey);
   // --- Custom states for DateTimePickerModal (for editing existing tasks) ---
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -243,6 +251,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   // Title (for create mode)
   const [title, setTitle] = useState(titleLabel || "");
   const newListKeyRef = useRef<string>(Date.now().toString());
+  // Track if list is already saved in create mode
+  const listSavedRef = useRef(false);
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -889,6 +899,27 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     setRenaming(false);
   };
 
+  // --- List title change handler for create mode ---
+  const handleListTitleChange = (newTitle: string) => {
+    setTitle(newTitle);
+    // Only in create mode, for new lists
+    if (mode === "create" && !listSavedRef.current && newTitle.trim() !== "") {
+      const id = Date.now().toString();
+      const newList = {
+        key: id,
+        label: newTitle.trim(),
+        color: randomColor(),
+        icon: "format-list-bulleted",
+        count: 0,
+        createdAt: Date.now(),
+      };
+      setLists([...lists, newList]);
+      setActiveListKey(newList.key);
+      newListKeyRef.current = id;
+      listSavedRef.current = true;
+    }
+  };
+
   // Date picker handler for editing a selected task's due date (iOS inline picker)
   const onChangeDate = async (event: any, selectedDate?: Date) => {
     if (event.type !== "set" || !selectedDate) {
@@ -1292,7 +1323,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             <TextInput
               placeholder={t("NamelesList")}
               value={title}
-              onChangeText={setTitle}
+              onChangeText={handleListTitleChange}
               style={[styles.renameInput, { color: theme.text }]}
               placeholderTextColor={theme.placeholder}
             />
@@ -1639,7 +1670,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     fontSize: 18,
-    backgroundColor: "#F9FAFB",
+    backgroundColor: "transparent",
   },
   inputCard: {
     flexDirection: "row",

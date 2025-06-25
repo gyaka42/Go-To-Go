@@ -68,7 +68,7 @@ export default function SearchScreen() {
     const q = query.toLowerCase();
     (async () => {
       const allLists = [...baseMenu, ...lists];
-      const matches: SearchResult[] = [];
+      const matchesMap = new Map<string, SearchResult>();
       for (const lst of allLists) {
         let tasks = tasksMap[lst.key];
         if (tasks === undefined) {
@@ -77,17 +77,24 @@ export default function SearchScreen() {
         }
         tasks.forEach((t) => {
           if (t.title.toLowerCase().includes(q)) {
-            matches.push({
-              id: t.id,
-              title: t.title,
-              done: t.done,
-              listKey: lst.key,
-              listLabel: lst.label,
-            });
+            const matchKey = `${t.id}@${lst.key}`;
+            if (!matchesMap.has(matchKey)) {
+              matchesMap.set(matchKey, {
+                id: t.id,
+                title: t.title,
+                done: t.done,
+                listKey: lst.key,
+                listLabel: lst.label,
+              });
+            }
           }
         });
       }
-      setResults(matches);
+      console.log(
+        "Search matches:",
+        Array.from(matchesMap.values()).map((m) => `${m.id}@${m.listKey}`)
+      );
+      setResults(Array.from(matchesMap.values()));
     })();
   }, [query, lists, tasksMap]);
 

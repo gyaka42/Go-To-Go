@@ -42,6 +42,8 @@ interface AppState {
   scheme: ColorSchemeName;
   lang: Lang;
   pendingNotificationId: string | null;
+  activeListKey: string | null;
+  setActiveListKey: (key: string | null) => void;
   setLists: (lists: ListItem[]) => void;
   setTasksMap: (map: Record<string, Task[]>) => void;
   setMode: (mode: ThemeMode) => void;
@@ -61,6 +63,8 @@ export const useAppStore = create<AppState>()(
       scheme: Appearance.getColorScheme() || "light",
       lang: "nl",
       pendingNotificationId: null,
+      activeListKey: null,
+      setActiveListKey: (key) => set({ activeListKey: key }),
       setLists: (newLists) => {
         const current = get().lists;
         const combined = [...current, ...newLists];
@@ -111,6 +115,7 @@ export const useAppStore = create<AppState>()(
         mode: state.mode,
         lang: state.lang,
         pendingNotificationId: state.pendingNotificationId,
+        activeListKey: state.activeListKey,
       }),
     }
   )
