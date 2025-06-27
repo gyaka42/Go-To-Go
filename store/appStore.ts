@@ -72,7 +72,18 @@ export const useAppStore = create<AppState>()(
         set({ lists: unique });
       },
       setTasksMap: (map) => {
-        set({ tasksMap: map });
+        // Verwijder highlight van alle taken bij het laden
+        const cleanedMap: Record<string, Task[]> = {};
+
+        for (const [listKey, tasks] of Object.entries(map)) {
+          cleanedMap[listKey] = tasks.map((task) => ({
+            ...task,
+            highlight: false,
+          }));
+        }
+
+        set({ tasksMap: cleanedMap });
+        console.log("🧼 highlight reset uitgevoerd bij setTasksMap");
       },
       setMode: (mode) => {
         set({

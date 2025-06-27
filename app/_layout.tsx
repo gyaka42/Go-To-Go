@@ -20,6 +20,26 @@ function InnerLayout() {
   const t = useAppStore((s) => s.t);
   const router = useRouter();
 
+  const activeListKey = useAppStore((s) => s.activeListKey);
+  const tasksMap = useAppStore((s) => s.tasksMap);
+  const tasks = tasksMap[activeListKey ?? ""] ?? [];
+  const setTasksMap = useAppStore((s) => s.setTasksMap);
+
+  useEffect(() => {
+    if (!activeListKey) return;
+
+    const hadHighlight = tasks.some((t) => t.highlight);
+    if (hadHighlight) {
+      const updated = tasks.map((t) =>
+        t.highlight ? { ...t, highlight: false } : t
+      );
+      setTasksMap({
+        ...useAppStore.getState().tasksMap,
+        [activeListKey]: updated,
+      });
+    }
+  }, [activeListKey, tasks]);
+
   useEffect(() => {
     (async () => {
       // Vraag eerst notificatie-permissies
