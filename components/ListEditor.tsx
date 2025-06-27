@@ -146,8 +146,6 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     );
   };
   
-
-  // Handler for DateTimePickerModal confirm (for editing existing tasks or new task)
   const [draftTask, setDraftTask] = useState<{ dueDate?: Date } | null>(null);
   const handleConfirm = (date: Date) => {
     setDueDate(date); // laat deze staan als je wil dat het huidige inputveld visueel update
