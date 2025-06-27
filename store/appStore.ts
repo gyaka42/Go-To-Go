@@ -125,9 +125,11 @@ export const useAppStore = create<AppState>()(
         tasksMap: state.tasksMap,
         mode: state.mode,
         lang: state.lang,
-        pendingNotificationId: state.pendingNotificationId,
         activeListKey: state.activeListKey,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setPendingNotificationId(null);
+      },
     }
   )
 );
