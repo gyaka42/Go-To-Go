@@ -9,6 +9,7 @@ import {
   Platform,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useAppStore } from "../store/appStore";
 
 type Props = {
   visible: boolean;
@@ -28,6 +29,19 @@ export default function DateTimePickerModal({
   const colorScheme = useColorScheme();
   const background = colorScheme === "dark" ? "#1c1c1e" : "#fff";
   const [tempDate, setTempDate] = useState(date);
+
+  const lang = useAppStore((s) => s.lang);
+  const t = useAppStore((s) => s.t);
+
+  const localeMap: Record<string, string> = {
+    en: "en-US",
+    nl: "nl-NL",
+    tr: "tr-TR",
+    de: "de-DE",
+    es: "es-ES",
+    fr: "fr-FR",
+  };
+  const langLocale = localeMap[lang] || "en-US";
 
   useEffect(() => {
     if (visible) {
@@ -68,7 +82,7 @@ export default function DateTimePickerModal({
               onChange={(event, selectedDate) => {
                 if (selectedDate) onChange(selectedDate);
               }}
-              locale="nl-NL"
+              locale={langLocale}
               themeVariant={colorScheme === "dark" ? "dark" : "light"}
             />
           )}
@@ -76,7 +90,7 @@ export default function DateTimePickerModal({
             onPress={() => onConfirm(tempDate)}
             style={{ marginTop: 12, alignSelf: "flex-end" }}
           >
-            <Text style={{ color: "#007aff", fontSize: 16 }}>Gereed</Text>
+            <Text style={{ color: "#007aff", fontSize: 16 }}>{t("Done")}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

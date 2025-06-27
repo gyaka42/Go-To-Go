@@ -209,6 +209,15 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const scheme = useAppStore((s) => s.scheme);
   const lang = useAppStore((s) => s.lang);
   const t = useAppStore((s) => s.t);
+  const localeMap: Record<string, string> = {
+    en: "en-US",
+    nl: "nl-NL",
+    tr: "tr-TR",
+    de: "de-DE",
+    es: "es-ES",
+    fr: "fr-FR",
+  };
+  const langLocale = localeMap[lang] || "en-US";
   const theme =
     scheme === "dark"
       ? {
@@ -1645,6 +1654,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           onConfirm={handleConfirm}
           onCancel={() => setShowDatePickerModal(false)}
           is24Hour={true}
+          locale={langLocale}
+          confirmTextIOS={t("save")}
+          cancelTextIOS={t("cancel")}
         />
       )}
     </SafeAreaView>
