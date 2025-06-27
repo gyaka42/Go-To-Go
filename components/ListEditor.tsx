@@ -714,10 +714,14 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       nextDate.toISOString()
     );
 
+    const listLabel =
+      useAppStore.getState().findListLabel?.(activeListKey || "") ??
+      "Unknown list";
+
     const newNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: task.title,
-        body: "Reminder for your task",
+        body: `Reminder for "${task.title}" in list "${listLabel}"`,
         sound: true,
         data: {
           listKey: activeListKey,
@@ -971,10 +975,14 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     }
 
     // Plan nieuwe notificatie
+    const listLabel =
+      useAppStore.getState().findListLabel?.(selectedTask.listKey) ??
+      "Unknown list";
+
     const newNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: selectedTask.title,
-        body: "Reminder for your task",
+        body: `Reminder for "${selectedTask.title}" in list "${listLabel}"`,
         sound: true,
       },
       trigger: {
@@ -1075,10 +1083,13 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     };
 
     const notify = async () => {
+      const listLabel =
+        useAppStore.getState().findListLabel?.(item.listKey) ?? "Unknown list";
+
       await Notifications.scheduleNotificationAsync({
         content: {
           title: item.title,
-          body: "Reminder for your task",
+          body: `Reminder for "${item.title}" in list "${listLabel}"`,
           sound: true,
         },
         trigger: item.dueDate
@@ -1419,11 +1430,16 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                     );
                   }
 
+                  const listLabel =
+                    useAppStore
+                      .getState()
+                      .findListLabel?.(selectedTask.listKey) ?? "Unknown list";
+
                   const newNotificationId =
                     await Notifications.scheduleNotificationAsync({
                       content: {
                         title: selectedTask.title,
-                        body: "Reminder for your task",
+                        body: `Reminder for "${selectedTask.title}" in list "${listLabel}"`,
                         sound: true,
                       },
                       trigger: {
