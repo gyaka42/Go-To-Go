@@ -52,5 +52,7 @@
   "save": "Enregistrer",
   "Time": "Heure",
   "error": "Erreur",
-  "recurrenceNeedsDate": "Veuillez ajouter une date et une heure avant de définir une récurrence."
+  "recurrenceNeedsDate": "Veuillez ajouter une date et une heure avant de définir une récurrence.",
+  "taskReminderTitle": "Rappel de tâche",
+  "taskReminderBody": "Rappel pour \"{{task}}\" dans la liste \"{{list}}\""
 }

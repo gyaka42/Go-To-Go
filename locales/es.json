@@ -52,5 +52,7 @@
   "save": "Guardar",
   "Time": "Hora",
   "error": "Error",
-  "recurrenceNeedsDate": "Agrega una fecha y hora antes de establecer una repetición."
+  "recurrenceNeedsDate": "Agrega una fecha y hora antes de establecer una repetición.",
+  "taskReminderTitle": "Recordatorio de tarea",
+  "taskReminderBody": "Recordatorio para \"{{task}}\" en la lista \"{{list}}\""
 }

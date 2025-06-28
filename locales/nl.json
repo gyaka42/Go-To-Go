@@ -52,5 +52,7 @@
   "save": "Opslaan",
   "Time": "Tijd",
   "error": "Fout",
-  "recurrenceNeedsDate": "Voeg eerst een datum en tijd toe voordat je een herhaling instelt."
+  "recurrenceNeedsDate": "Voeg eerst een datum en tijd toe voordat je een herhaling instelt.",
+  "taskReminderTitle": "Taakherinnering",
+  "taskReminderBody": "Herinnering voor \"{{task}}\" in lijst \"{{list}}\""
 }

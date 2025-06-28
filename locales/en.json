@@ -52,5 +52,7 @@
   "save": "Save",
   "Time": "Time",
   "error": "Error",
-  "recurrenceNeedsDate": "Please add a date and time before setting a recurrence."
+  "recurrenceNeedsDate": "Please add a date and time before setting a recurrence.",
+  "taskReminderTitle": "Task reminder",
+  "taskReminderBody": "Reminder for \"{{task}}\" in list \"{{list}}\""
 }

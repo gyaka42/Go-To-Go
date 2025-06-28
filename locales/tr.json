@@ -52,5 +52,7 @@
   "save": "Kaydet",
   "Time": "Saat",
   "error": "Hata",
-  "recurrenceNeedsDate": "Tekrarlama ayarlamadan önce lütfen bir tarih ve saat ekleyin."
+  "recurrenceNeedsDate": "Tekrarlama ayarlamadan önce lütfen bir tarih ve saat ekleyin.",
+  "taskReminderTitle": "Görev hatırlatıcısı",
+  "taskReminderBody": "\"{{task}}\" görevi için \"{{list}}\" listesinde hatırlatma"
 }

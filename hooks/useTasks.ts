@@ -19,15 +19,18 @@ export default function useTasks(
       const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
       if (seconds <= 0) return;
 
-      // ✅ lijstnaam ophalen voor body
-      const listLabel =
-        useAppStore.getState().findListLabel?.(listKey) ?? "onbekende lijst";
+      // ✅ Get list name for body text
+      const { findListLabel, t } = useAppStore.getState();
+      const listLabel = findListLabel?.(listKey) ?? "Unknown list";
 
       try {
         const identifier = await Notifications.scheduleNotificationAsync({
           content: {
-            title: "Taakherinnering",
-            body: `Herinnering voor "${title}" in lijst "${listLabel}"`,
+            title: t("taskReminderTitle"),
+            body: t("taskReminderBody", {
+              task: title,
+              list: listLabel,
+            }),
             sound: "default",
             data: { listKey },
           },

@@ -2,6 +2,7 @@ import { Appearance, ColorSchemeName } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import * as Notifications from "expo-notifications";
 import en from "../locales/en.json";
 import nl from "../locales/nl.json";
 import tr from "../locales/tr.json";
@@ -94,6 +95,41 @@ export const useAppStore = create<AppState>()(
       },
       setLang: (lang) => {
         set({ lang });
+        const { tasksMap, findListLabel, t } = get();
+        (async () => {
+          for (const [listKey, tasks] of Object.entries(tasksMap)) {
+            for (const task of tasks) {
+              if (task.notificationId && task.dueDate) {
+                const due = new Date(task.dueDate);
+                if (due.getTime() > Date.now()) {
+                  try {
+                    await Notifications.cancelScheduledNotificationAsync(
+                      task.notificationId
+                    );
+                  } catch {}
+                  const listLabel = findListLabel(listKey);
+                  const newId = await Notifications.scheduleNotificationAsync({
+                    content: {
+                      title: t("taskReminderTitle"),
+                      body: t("taskReminderBody", {
+                        task: task.title,
+                        list: listLabel,
+                      }),
+                      sound: "default",
+                      data: { listKey },
+                    },
+                    trigger: {
+                      type: Notifications.SchedulableTriggerInputTypes.DATE,
+                      date: due,
+                    },
+                  });
+                  task.notificationId = newId;
+                }
+              }
+            }
+          }
+          set({ tasksMap: { ...tasksMap } });
+        })();
       },
       setPendingNotificationId: (id) => set({ pendingNotificationId: id }),
       t: (key, vars) => {

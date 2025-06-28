@@ -758,14 +758,14 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       nextDate.toISOString()
     );
 
+    const { findListLabel, t } = useAppStore.getState();
     const listLabel =
-      useAppStore.getState().findListLabel?.(activeListKey || "") ??
-      "Unknown list";
+      findListLabel?.(activeListKey || "") ?? "Unknown list";
 
     const newNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: task.title,
-        body: `Reminder for "${task.title}" in list "${listLabel}"`,
+        title: t("taskReminderTitle"),
+        body: t("taskReminderBody", { task: task.title, list: listLabel }),
         sound: true,
         data: {
           listKey: activeListKey,
@@ -1019,14 +1019,17 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     }
 
     // Plan nieuwe notificatie
+    const { findListLabel, t } = useAppStore.getState();
     const listLabel =
-      useAppStore.getState().findListLabel?.(selectedTask.listKey) ??
-      "Unknown list";
+      findListLabel?.(selectedTask.listKey) ?? "Unknown list";
 
     const newNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
-        title: selectedTask.title,
-        body: `Reminder for "${selectedTask.title}" in list "${listLabel}"`,
+        title: t("taskReminderTitle"),
+        body: t("taskReminderBody", {
+          task: selectedTask.title,
+          list: listLabel,
+        }),
         sound: true,
       },
       trigger: {
@@ -1127,13 +1130,15 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     };
 
     const notify = async () => {
+      const { findListLabel, t } = useAppStore.getState();
       const listLabel =
-        useAppStore.getState().findListLabel?.(item.listKey) ?? "Unknown list";
+        findListLabel?.(item.listKey) ?? "Unknown list";
+
 
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: item.title,
-          body: `Reminder for "${item.title}" in list "${listLabel}"`,
+          title: t("taskReminderTitle"),
+          body: t("taskReminderBody", { task: item.title, list: listLabel }),
           sound: true,
         },
         trigger: item.dueDate
@@ -1473,16 +1478,18 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                     );
                   }
 
+                  const { findListLabel, t } = useAppStore.getState();
                   const listLabel =
-                    useAppStore
-                      .getState()
-                      .findListLabel?.(selectedTask.listKey) ?? "Unknown list";
+                    findListLabel?.(selectedTask.listKey) ?? "Unknown list";
 
                   const newNotificationId =
                     await Notifications.scheduleNotificationAsync({
                       content: {
-                        title: selectedTask.title,
-                        body: `Reminder for "${selectedTask.title}" in list "${listLabel}"`,
+                        title: t("taskReminderTitle"),
+                        body: t("taskReminderBody", {
+                          task: selectedTask.title,
+                          list: listLabel,
+                        }),
                         sound: true,
                       },
                       trigger: {
