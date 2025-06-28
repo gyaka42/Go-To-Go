@@ -49,5 +49,8 @@
   "sa": "Cmt",
   "su": "Paz",
   "cancel": "İptal",
-  "save": "Kaydet"
+  "save": "Kaydet",
+  "Time": "Saat",
+  "error": "Hata",
+  "recurrenceNeedsDate": "Tekrarlama ayarlamadan önce lütfen bir tarih ve saat ekleyin."
 }

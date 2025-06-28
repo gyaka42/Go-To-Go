@@ -49,5 +49,8 @@
   "sa": "Sa",
   "su": "Di",
   "cancel": "Annuler",
-  "save": "Enregistrer"
+  "save": "Enregistrer",
+  "Time": "Heure",
+  "error": "Erreur",
+  "recurrenceNeedsDate": "Veuillez ajouter une date et une heure avant de définir une récurrence."
 }

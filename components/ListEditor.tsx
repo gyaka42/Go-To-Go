@@ -26,7 +26,7 @@ import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import DateTimePickerModal from "react-native-modal-datetime-picker";
+import CustomDateTimePickerModal from "./CustomDateTimePickerModal";
 import * as Notifications from "expo-notifications";
 // Set global notification handler
 Notifications.setNotificationHandler({
@@ -155,6 +155,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         t.id === selectedTask.id ? { ...t, dueDate: date } : t
       );
       setTasks(updatedTasks);
+        } else {
+      setNewTaskDueDate(date);
     }
   };
   // Highlight/scroll feature: flatListRef and highlight state
@@ -266,8 +268,6 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 
   // DatePicker state
   const [datePickerFor, setDatePickerFor] = useState<string | null>(null);
-  // react-native-modal-datetime-picker state for new task
-  const [isDatePickerVisible, setDatePickerVisibility] = useState(false);
   // iOS Date/Time temporary states (used only for legacy inline picker, can be removed if fully migrated)
   const [iosDate, setIosDate] = useState<Date | null>(null);
   const [iosTime, setIosTime] = useState<Date | null>(null);
@@ -284,7 +284,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   // Handler voor kalenderknop bij nieuwe taak
   const handleNewTaskCalendarPress = () => {
     setSelectedTask(null);
-    setNewTaskDueDate(new Date());
+    setNewTaskDueDate((prev) => prev ?? new Date());
     setShowDatePickerModal(true);
   };
 
@@ -1639,23 +1639,18 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             </View>
           </KeyboardAvoidingView>
         </Modal>
-      {/* iOS DateTimePickerModal for editing or creating a task's due date */}
+      {/* Custom iOS DateTimePickerModal */}
       {Platform.OS === 'ios' && showDatePickerModal && (
-          <DateTimePickerModal
-          isVisible={showDatePickerModal}
-          mode="datetime"
+          <CustomDateTimePickerModal
+          visible={showDatePickerModal}
           date={
             selectedTask?.dueDate
               ? new Date(selectedTask.dueDate)
               : newTaskDueDate ?? new Date()
           }
-          display="inline"
           onConfirm={handleConfirm}
           onCancel={() => setShowDatePickerModal(false)}
-          is24Hour={true}
-          locale={langLocale}
-          confirmTextIOS={t("save")}
-          cancelTextIOS={t("cancel")}
+          
         />
       )}
     </SafeAreaView>

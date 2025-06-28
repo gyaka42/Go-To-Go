@@ -49,5 +49,8 @@
   "sa": "Sa",
   "su": "So",
   "cancel": "Abbrechen",
-  "save": "Speichern"
+  "save": "Speichern",
+  "Time": "Zeit",
+  "error": "Fehler",
+  "recurrenceNeedsDate": "Bitte zuerst ein Datum und eine Uhrzeit hinzufügen, bevor du eine Wiederholung einstellst."
 }

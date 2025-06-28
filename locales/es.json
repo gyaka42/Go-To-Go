@@ -49,5 +49,8 @@
   "sa": "Sa",
   "su": "Do",
   "cancel": "Cancelar",
-  "save": "Guardar"
+  "save": "Guardar",
+  "Time": "Hora",
+  "error": "Error",
+  "recurrenceNeedsDate": "Agrega una fecha y hora antes de establecer una repetición."
 }

@@ -49,5 +49,8 @@
   "sa": "Sa",
   "su": "Su",
   "cancel": "Cancel",
-  "save": "Save"
+  "save": "Save",
+  "Time": "Time",
+  "error": "Error",
+  "recurrenceNeedsDate": "Please add a date and time before setting a recurrence."
 }
