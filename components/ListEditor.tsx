@@ -42,7 +42,6 @@ Notifications.setNotificationHandler({
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation } from "@react-navigation/native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { Task, useAppStore } from '../store/appStore';
 
@@ -1642,7 +1641,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         </Modal>
       {/* iOS DateTimePickerModal for editing or creating a task's due date */}
       {Platform.OS === 'ios' && showDatePickerModal && (
-        <DateTimePickerModal
+          <DateTimePickerModal
           isVisible={showDatePickerModal}
           mode="datetime"
           date={

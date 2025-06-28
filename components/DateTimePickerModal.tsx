@@ -61,7 +61,9 @@ export default function DateTimePickerModal({
           flex: 1,
           backgroundColor: "rgba(0,0,0,0.3)",
           justifyContent: "center",
-          padding: 24,
+          paddingTop: 24,
+          paddingHorizontal: 24,
+          paddingBottom: 48
         }}
         onPress={onCancel}
       >
@@ -75,16 +77,18 @@ export default function DateTimePickerModal({
           }}
         >
           {date instanceof Date && !isNaN(date.getTime()) && (
-            <DateTimePicker
-              value={tempDate}
-              mode="datetime"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(event, selectedDate) => {
-                if (selectedDate) onChange(selectedDate);
-              }}
-              locale={langLocale}
-              themeVariant={colorScheme === "dark" ? "dark" : "light"}
-            />
+            <View style={{ marginBottom: 8 }}>
+              <DateTimePicker
+                value={tempDate}
+                mode="datetime"
+                display={Platform.OS === "ios" ? "inline" : "default"}
+                onChange={(event, selectedDate) => {
+                  if (selectedDate) onChange(selectedDate);
+                }}
+                locale={langLocale}
+                themeVariant={colorScheme === "dark" ? "dark" : "light"}
+              />
+            </View>
           )}
           <Pressable
             onPress={() => onConfirm(tempDate)}
