@@ -44,10 +44,14 @@ export default function HomeScreen() {
   const [langMenuVisible, setLangMenuVisible] = useState(false);
 
   const closeAllModals = () => {
+    cancelModalQueue();
     setLangMenuVisible(false);
   };
 
-  const openWithQueue = useModalQueue([() => langMenuVisible], closeAllModals);
+  const [openWithQueue, cancelModalQueue] = useModalQueue(
+    [() => langMenuVisible],
+    closeAllModals
+  );
   
   // 1️⃣ Hooks die we altijd willen aanroepen – óók voordat we weten of we isReady zijn:
   const [isReady, setIsReady] = useState(false);
@@ -166,7 +170,10 @@ export default function HomeScreen() {
   // Sluit het taalmenu bij navigeren weg van dit scherm
   useFocusEffect(
     useCallback(() => {
-      return () => setLangMenuVisible(false);
+      return () => {
+        cancelModalQueue();
+        setLangMenuVisible(false);
+      };
     }, [])
   );
 
@@ -345,16 +352,22 @@ export default function HomeScreen() {
         </View>
       </View>
       {langMenuVisible && (
-        <Modal
-          transparent
-          animationType="fade"
-          presentationStyle="overFullScreen"
-          onRequestClose={() => setLangMenuVisible(false)}
-        >
-          <TouchableOpacity
-            style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
-            onPress={() => setLangMenuVisible(false)}
-          />
+          <Modal
+            transparent
+            animationType="fade"
+            presentationStyle="overFullScreen"
+            onRequestClose={() => {
+              cancelModalQueue();
+              setLangMenuVisible(false);
+            }}
+          >
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
+              onPress={() => {
+                cancelModalQueue();
+                setLangMenuVisible(false);
+              }}
+            />
           <View
             style={{
               position: "absolute",
@@ -380,6 +393,7 @@ export default function HomeScreen() {
                 }}
                 onPress={() => {
                   setLang(code as any);
+                   cancelModalQueue();
                   setLangMenuVisible(false);
                 }}
               >

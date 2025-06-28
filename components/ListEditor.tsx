@@ -281,6 +281,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   useFocusEffect(
     React.useCallback(() => {
       return () => {
+        cancelModalQueue();
         setShowOptions(false);
         setShowShare(false);
         setShowShareModal(false);
@@ -299,13 +300,14 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const [showShareModal, setShowShareModal] = useState(false);
 
   const closeAllModals = () => {
+    cancelModalQueue();
     setShowOptions(false);
     setShowShare(false);
     setShowShareModal(false);
     setShowDatePickerModal(false);
   };
 
-  const openWithQueue = useModalQueue(
+  const [openWithQueue, cancelModalQueue] = useModalQueue(
     [
       () => showOptions,
       () => showShare,
@@ -1571,29 +1573,41 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           transparent
           animationType="slide"
           presentationStyle="overFullScreen"
-          onRequestClose={() => setShowOptions(false)}
+          onRequestClose={() => {
+            cancelModalQueue();
+            setShowOptions(false);
+          }}
         >
           <View style={styles.modal}>
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
-              onPress={() => setShowOptions(false)}
+              onPress={() => {
+                cancelModalQueue();
+                setShowOptions(false);
+              }}
             />
             <OptionsSheet
               style={styles.sheet}
-              onClose={() => setShowOptions(false)}
+              onClose={() => {
+                cancelModalQueue();
+                setShowOptions(false);
+              }}
               onSortAlphabetical={() => {
                 setTasks((t) =>
                   [...t].sort((a, b) => a.title.localeCompare(b.title))
                 );
+                cancelModalQueue();
                 setShowOptions(false);
               }}
               onSortByDate={() => {
                 setTasks((t) =>
                   [...t].sort((a, b) => Number(a.id) - Number(b.id))
                 );
+                cancelModalQueue();
                 setShowOptions(false);
               }}
               onCopy={async () => {
+                 cancelModalQueue();
                 setShowOptions(false);
                 // Build the share content: title plus task list
                 const listTitle =
@@ -1641,7 +1655,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                 } catch (error) {
                   console.error("Print failed:", error);
                 }
-
+                cancelModalQueue();
                 setShowOptions(false);
               }}
             />

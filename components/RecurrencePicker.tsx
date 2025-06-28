@@ -41,11 +41,12 @@ export default function RecurrencePicker({
   const [customVisible, setCustomVisible] = useState(false);
 
   const closeAllModals = () => {
+    cancelModalQueue();
     setMenuVisible(false);
     setCustomVisible(false);
   };
 
-  const openWithQueue = useModalQueue(
+  const [openWithQueue, cancelModalQueue] = useModalQueue(
     [() => menuVisible, () => customVisible],
     closeAllModals
   );
@@ -99,6 +100,7 @@ export default function RecurrencePicker({
 
   // Presets
   const handlePreset = (t: "none" | "daily" | "weekly" | "monthly") => {
+    cancelModalQueue();
     setMenuVisible(false);
     if (t === "none") {
       setOptsState(undefined);
@@ -128,6 +130,7 @@ export default function RecurrencePicker({
     const customOpts = { freq, interval: Number(interval) || 1, byweekday };
     setOptsState(customOpts);
     onChange(customOpts);
+    cancelModalQueue();
     setCustomVisible(false);
     setMenuVisible(false);
   };
@@ -192,7 +195,13 @@ export default function RecurrencePicker({
               title={t("custom")}
               onPress={() => openWithQueue(() => setCustomVisible(true))}
             />
-            <Button title={t("close")} onPress={() => setMenuVisible(false)} />
+            <Button
+              title={t("close")}
+              onPress={() => {
+                cancelModalQueue();
+                setMenuVisible(false);
+              }}
+            />
           </View>
         </View>
       </Modal>
@@ -301,7 +310,10 @@ export default function RecurrencePicker({
               <Button
                 title={t("cancel")}
                 color="#2563EB"
-                onPress={() => setCustomVisible(false)}
+                onPress={() => {
+                  cancelModalQueue();
+                  setCustomVisible(false);
+                }}
               />
               <Button title={t("save")} color="#2563EB" onPress={saveCustom} />
             </View>

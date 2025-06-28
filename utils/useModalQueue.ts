@@ -28,11 +28,11 @@ export default function useModalQueue(
     }
   };
 
-  return (open: () => void) => {
-    if (visibilities.every((fn) => !fn())) {
-      open();
+  const open = (fn: () => void) => {
+    if (visibilities.every((v) => !v())) {
+      fn();
     } else {
-      queued.current = open;
+      queued.current = fn;
       closeAll();
       if (timeout.current) clearTimeout(timeout.current);
       InteractionManager.runAfterInteractions(() => {
@@ -40,4 +40,10 @@ export default function useModalQueue(
       });
     }
   };
+  const cancel = () => {
+    if (timeout.current) clearTimeout(timeout.current);
+    queued.current = null;
+  };
+
+  return [open, cancel] as const;
 }
