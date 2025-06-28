@@ -142,8 +142,23 @@ export const useAppStore = create<AppState>()(
         return str;
       },
       findListLabel: (key: string) => {
+        // Fallback for default lists based on current language
+        const defaultKeys: Record<string, string> = {
+          mijnDag: "myDay",
+          belangrijk: "important",
+          gepland: "planned",
+          taken: "tasks",
+        };
+
+        const translationKey = defaultKeys[key];
+        if (translationKey) {
+          const t = get().t;
+          return t(translationKey);
+        }
         const list = get().lists.find((l) => l.key === key);
-        return list?.label ?? "Unknown list";
+        if (list) return list.label;
+
+        return "Unknown list";
       },
       removeList: (key) => {
         const currentLists = get().lists;
