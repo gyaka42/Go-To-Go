@@ -156,6 +156,13 @@ export default function HomeScreen() {
     });
   }, []);
 
+  // Sluit het taalmenu bij navigeren weg van dit scherm
+  useFocusEffect(
+    useCallback(() => {
+      return () => setLangMenuVisible(false);
+    }, [])
+  );
+
   // 5️⃣ useFocusEffect: badge‐counts telkens als lijsten veranderen
   useFocusEffect(
     useCallback(() => {

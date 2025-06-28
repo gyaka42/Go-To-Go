@@ -40,7 +40,7 @@ Notifications.setNotificationHandler({
     }),
 });
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 
 import { Task, useAppStore } from '../store/appStore';
@@ -275,6 +275,22 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   // Modal Date Picker Handlers for new task
   const hideDatePicker = () => setShowDatePickerModal(false);
+
+ // Sluit alle modals wanneer het scherm wordt verlaten
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        setShowOptions(false);
+        setShowShare(false);
+        setShowShareModal(false);
+        setShowDatePickerModal(false);
+        setShowDatePicker(false);
+        setDatePickerFor(null);
+        setIosDate(null);
+        setIosTime(null);
+      };
+    }, [])
+  );
 
   // Options sheet / share modal
   const [showOptions, setShowOptions] = useState(false);
@@ -1532,7 +1548,13 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           />
         </View>
 
-        <Modal visible={showOptions} transparent animationType="slide">
+        {showOptions && (
+        <Modal
+          visible={showOptions}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowOptions(false)}
+        >
           <View style={styles.modal}>
             <TouchableOpacity
               style={StyleSheet.absoluteFill}
@@ -1608,25 +1630,37 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             />
           </View>
         </Modal>
+        )}
 
-        <Modal visible={showShare} animationType="slide" transparent={false}>
+       {showShare && (
+        <Modal
+          visible={showShare}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setShowShare(false)}
+        >
           <ShareModal
             onClose={() => setShowShare(false)}
             listTitle={mode === "edit" ? activeList?.label || "" : title}
             tasks={tasks}
           />
         </Modal>
+         )}
 
-        <Modal visible={showShareModal} transparent animationType="slide">
+        {showShareModal && (
+        <Modal
+          visible={showShareModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowShareModal(false)}
+        >
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
             keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
           >
             <View style={styles.modal}>
-              <TouchableWithoutFeedback
-                onPress={() => setShowShareModal(false)}
-              >
+              <TouchableWithoutFeedback onPress={() => setShowShareModal(false)}>
                 <View style={StyleSheet.absoluteFill} />
               </TouchableWithoutFeedback>
               <View style={styles.sheet}>
@@ -1639,6 +1673,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             </View>
           </KeyboardAvoidingView>
         </Modal>
+        )}
       {/* Custom iOS DateTimePickerModal */}
       {Platform.OS === 'ios' && showDatePickerModal && (
           <CustomDateTimePickerModal
