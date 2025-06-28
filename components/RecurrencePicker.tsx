@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { RRule, Options as RRuleOptions, Frequency } from "rrule";
 import { useAppStore } from "../store/appStore";
+import useModalQueue from "../utils/useModalQueue";
 
 type Props = {
   initial?: Partial<RRuleOptions>;
@@ -38,6 +39,17 @@ export default function RecurrencePicker({
   ];
   const [menuVisible, setMenuVisible] = useState(false);
   const [customVisible, setCustomVisible] = useState(false);
+
+  const closeAllModals = () => {
+    setMenuVisible(false);
+    setCustomVisible(false);
+  };
+
+  const openWithQueue = useModalQueue(
+    [() => menuVisible, () => customVisible],
+    closeAllModals
+  );
+
   const [interval, setInterval] = useState(String(initial?.interval ?? 1));
   const [freq, setFreq] = useState<Frequency>(
     initial?.freq ?? Frequency.WEEKLY
@@ -135,7 +147,7 @@ export default function RecurrencePicker({
           },
           style,
         ]}
-        onPress={() => setMenuVisible(true)}
+        onPress={() => openWithQueue(() => setMenuVisible(true))}
       >
         {iconOnly ? (
           <Ionicons name="repeat" size={18} color="#2563EB" />
@@ -151,7 +163,11 @@ export default function RecurrencePicker({
         )}
       </TouchableOpacity>
 
-      <Modal visible={menuVisible} transparent>
+      <Modal
+        visible={menuVisible}
+        transparent
+        presentationStyle="overFullScreen"
+      >
         <View style={styles.backdrop}>
           <View
             style={[
@@ -174,17 +190,18 @@ export default function RecurrencePicker({
             />
             <Button
               title={t("custom")}
-              onPress={() => {
-                setMenuVisible(false);
-                setCustomVisible(true);
-              }}
+              onPress={() => openWithQueue(() => setCustomVisible(true))}
             />
             <Button title={t("close")} onPress={() => setMenuVisible(false)} />
           </View>
         </View>
       </Modal>
 
-      <Modal visible={customVisible} transparent>
+      <Modal
+        visible={customVisible}
+        transparent
+        presentationStyle="overFullScreen"
+      >
         <View style={styles.backdrop}>
           <View
             style={[

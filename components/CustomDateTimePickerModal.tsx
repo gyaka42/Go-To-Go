@@ -51,6 +51,7 @@ export default function CustomDateTimePickerModal({
       transparent
       visible={visible}
       animationType="fade"
+      presentationStyle="overFullScreen"
       onRequestClose={onCancel}
     >
       <Pressable

@@ -26,6 +26,7 @@ import Header from "../components/Header";
 import { useFocusEffect } from "@react-navigation/native";
 import { ListItem, Task, useAppStore } from "../store/appStore";
 import { useBaseMenu } from "../utils/menuDefaults";
+import useModalQueue from "../utils/useModalQueue";
 import { MaterialIcons } from "@expo/vector-icons";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -42,6 +43,12 @@ export default function HomeScreen() {
 
   const [langMenuVisible, setLangMenuVisible] = useState(false);
 
+  const closeAllModals = () => {
+    setLangMenuVisible(false);
+  };
+
+  const openWithQueue = useModalQueue([() => langMenuVisible], closeAllModals);
+  
   // 1️⃣ Hooks die we altijd willen aanroepen – óók voordat we weten of we isReady zijn:
   const [isReady, setIsReady] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
@@ -83,7 +90,7 @@ export default function HomeScreen() {
           <>
             {/* Language dropdown menu */}
             <TouchableOpacity
-              onPress={() => setLangMenuVisible(true)}
+              onPress={() => openWithQueue(() => setLangMenuVisible(true))}
               style={{ marginRight: 16, paddingHorizontal: 4 }}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
@@ -341,6 +348,7 @@ export default function HomeScreen() {
         <Modal
           transparent
           animationType="fade"
+          presentationStyle="overFullScreen"
           onRequestClose={() => setLangMenuVisible(false)}
         >
           <TouchableOpacity

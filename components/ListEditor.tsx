@@ -81,6 +81,7 @@ import ShareModal from "../app/new-list/share";
 import RecurrencePicker from "../components/RecurrencePicker";
 import { Options as RRuleOptions, Frequency } from "rrule";
 import { useBaseMenu } from "../utils/menuDefaults";
+import useModalQueue from "../utils/useModalQueue";
 
 function getRecurrenceLabel(
   recurrence?: Partial<RRuleOptions>,
@@ -297,11 +298,28 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const [showShare, setShowShare] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
+  const closeAllModals = () => {
+    setShowOptions(false);
+    setShowShare(false);
+    setShowShareModal(false);
+    setShowDatePickerModal(false);
+  };
+
+  const openWithQueue = useModalQueue(
+    [
+      () => showOptions,
+      () => showShare,
+      () => showShareModal,
+      () => showDatePickerModal,
+    ],
+    closeAllModals
+  );
+
   // Handler voor kalenderknop bij nieuwe taak
   const handleNewTaskCalendarPress = () => {
     setSelectedTask(null);
     setNewTaskDueDate((prev) => prev ?? new Date());
-    setShowDatePickerModal(true);
+    openWithQueue(() => setShowDatePickerModal(true));
   };
 
   // For edit mode, get list key from params if not provided
@@ -886,7 +904,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       ),
       headerRight: () => (
         <TouchableOpacity
-          onPress={() => setShowOptions(true)}
+          onPress={() => openWithQueue(() => setShowOptions(true))}
           style={{ marginRight: 16 }}
         >
           <Ionicons
@@ -1264,9 +1282,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
               {(dueDateLabel || recurrenceLabel) && (
                 <TouchableOpacity
                   onPress={() => {
-                    // Open the new DateTimePickerModal for editing this task's date
                     setSelectedTask(item);
-                    setShowDatePickerModal(true);
+                    openWithQueue(() => setShowDatePickerModal(true));
                   }}
                   style={{ marginRight: 8 }}
                 >
@@ -1553,6 +1570,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           visible={showOptions}
           transparent
           animationType="slide"
+          presentationStyle="overFullScreen"
           onRequestClose={() => setShowOptions(false)}
         >
           <View style={styles.modal}>
@@ -1591,8 +1609,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                   if (Platform.OS === "android") {
                     await Share.share({ message });
                   } else {
-                    // iOS/modal fallback
-                    setShowShareModal(true);
+                    openWithQueue(() => setShowShareModal(true));
                   }
                 } catch (e) {
                   console.error("Share failed:", e);
@@ -1636,7 +1653,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         <Modal
           visible={showShare}
           animationType="slide"
-          transparent={false}
+          transparent
+          presentationStyle="overFullScreen"
           onRequestClose={() => setShowShare(false)}
         >
           <ShareModal
@@ -1652,6 +1670,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           visible={showShareModal}
           transparent
           animationType="slide"
+          presentationStyle="overFullScreen"
           onRequestClose={() => setShowShareModal(false)}
         >
           <KeyboardAvoidingView
