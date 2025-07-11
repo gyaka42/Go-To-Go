@@ -1,4 +1,6 @@
 {
+  "NSPhotoLibraryUsageDescription": "Bir avatar seçmek için fotoğraf galerine erişmemiz gerekiyor.",
+  "NSCameraUsageDescription": "Avatarın için fotoğraf çekebilmek adına kamerana erişmemiz gerekiyor.",
   "welcome": "Tekrar hoş geldin, {{name}}!",
   "todayTasks": "Bugün yapılacak görevler:",
   "NewList": "Yeni Liste",

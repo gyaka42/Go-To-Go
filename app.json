@@ -25,10 +25,19 @@
         "tinted": "./assets/tinted-icon.png"
       },
       "infoPlist": {
-        "CFBundleDisplayName": "GoToGo Task",
+        "CFBundleDisplayName": "GoToGo Task!",
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "We hebben toegang tot je fotobibliotheek nodig om een avatar te kiezen.",
         "NSCameraUsageDescription": "We hebben toegang tot je camera nodig om een foto te maken voor je avatar."
+      },
+      "locales": {
+        "en": "./locales/en.json",
+        "nl": "./locales/nl.json",
+        "tr": "./locales/tr.json",
+        "de": "./locales/de.json",
+        "es": "./locales/es.json",
+        "fr": "./locales/fr.json",
+        "it": "./locales/it.json"
       }
     },
     "android": {

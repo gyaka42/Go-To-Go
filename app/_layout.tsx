@@ -82,6 +82,63 @@ function InnerLayout() {
         }
       });
 
+      // Plan volgende herhaling zodra een notificatie wordt ontvangen
+      Notifications.addNotificationReceivedListener(async (notification) => {
+        const notifId = notification.request.identifier;
+        const listKeyData = notification.request.content.data?.listKey as
+          | string
+          | undefined;
+        const { tasksMap, setTasksMap, findListLabel, t } =
+          useAppStore.getState();
+
+        for (const [key, tasks] of Object.entries(tasksMap)) {
+          const idx = tasks.findIndex((t) => t.notificationId === notifId);
+          if (idx !== -1) {
+            const task = tasks[idx];
+            if (task.recurrence && task.dueDate) {
+              const { RRule } = await import("rrule");
+              const rule = new RRule({
+                dtstart: new Date(task.dueDate),
+                ...task.recurrence,
+                count: 2,
+              });
+              const allDates = rule.all();
+              if (allDates.length >= 2) {
+                const nextDate = allDates[1];
+                const listLabel =
+                  findListLabel?.(listKeyData || key) ?? "Unknown list";
+                const newId = await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: t("taskReminderTitle"),
+                    body: t("taskReminderBody", {
+                      task: task.title,
+                      list: listLabel,
+                    }),
+                    sound: true,
+                    data: { listKey: key },
+                  },
+                  trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: nextDate,
+                  },
+                });
+
+                const updatedTask = {
+                  ...task,
+                  dueDate: nextDate,
+                  notificationId: newId,
+                };
+                const updatedTasks = tasks.map((t, i) =>
+                  i === idx ? updatedTask : t
+                );
+                setTasksMap({ ...tasksMap, [key]: updatedTasks });
+              }
+            }
+            break;
+          }
+        }
+      });
+
       // Vraag permissie voor fotos (image picker)
       const { status: imageStatus } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();

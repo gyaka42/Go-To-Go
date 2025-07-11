@@ -1,4 +1,6 @@
 {
+  "NSPhotoLibraryUsageDescription": "Wir benötigen Zugriff auf deine Fotobibliothek, um einen Avatar auszuwählen.",
+  "NSCameraUsageDescription": "Wir benötigen Zugriff auf deine Kamera, um ein Foto für deinen Avatar aufzunehmen.",
   "welcome": "Willkommen zurück, {{name}}!",
   "todayTasks": "Hier sind deine To-do`s für heute:",
   "NewList": "Neue Liste",
