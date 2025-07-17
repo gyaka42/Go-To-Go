@@ -2,7 +2,7 @@ import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import { Task, useAppStore } from "../store/appStore";
-import { RRule, Options as RRuleOptions } from "rrule";
+import { RRule, Options as RRuleOptions, Weekday } from "rrule";
 
 export default function useTasks(
   tasks: Task[],
@@ -14,7 +14,8 @@ export default function useTasks(
     async (
       title: string,
       date: Date,
-      listKey?: string
+      listKey?: string,
+      recurrence?: Partial<RRuleOptions>
     ): Promise<string | undefined> => {
       const seconds = Math.floor((date.getTime() - Date.now()) / 1000);
       if (seconds <= 0) return;
@@ -24,6 +25,55 @@ export default function useTasks(
       const listLabel = findListLabel?.(listKey) ?? "Unknown list";
 
       try {
+        let trigger: Notifications.NotificationTriggerInput = {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date,
+        };
+
+        if (recurrence) {
+          const freq = recurrence.freq;
+          const interval = recurrence.interval ?? 1;
+          if (freq === RRule.DAILY && interval === 1) {
+            trigger = {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              hour: date.getHours(),
+              minute: date.getMinutes(),
+              repeats: true,
+            };
+          } else if (
+            freq === RRule.WEEKLY &&
+            interval === 1 &&
+            Array.isArray(recurrence.byweekday) &&
+            recurrence.byweekday.length === 1
+          ) {
+            const rruleDay = recurrence.byweekday[0];
+            let weekdayIdx: number;
+            if (typeof rruleDay === "number") {
+              weekdayIdx = rruleDay;
+            } else if (typeof rruleDay === "string") {
+              const wk = (RRule as any)[rruleDay.toUpperCase()] as Weekday;
+              weekdayIdx = wk.weekday;
+            } else {
+              weekdayIdx = (rruleDay as Weekday).weekday;
+            }
+            const weekday = ((weekdayIdx + 1) % 7) + 1; // rrule 0=Mon
+            trigger = {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              weekday,
+              hour: date.getHours(),
+              minute: date.getMinutes(),
+              repeats: true,
+            };
+          } else if (freq === RRule.MONTHLY && interval === 1) {
+            trigger = {
+              type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+              day: date.getDate(),
+              hour: date.getHours(),
+              minute: date.getMinutes(),
+              repeats: true,
+            };
+          }
+        }
         const identifier = await Notifications.scheduleNotificationAsync({
           content: {
             title: t("taskReminderTitle"),
@@ -34,10 +84,7 @@ export default function useTasks(
             sound: "default",
             data: { listKey },
           },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date,
-          },
+          trigger,
         });
         return identifier;
       } catch (err) {
@@ -45,23 +92,6 @@ export default function useTasks(
       }
     },
     []
-  );
-
-  const scheduleNextOccurrence = useCallback(
-    async (
-      title: string,
-      previousDate: Date,
-      listKey?: string,
-      recurrence?: Partial<RRuleOptions>
-    ) => {
-      if (!recurrence) return;
-      const rule = new RRule({ dtstart: previousDate, ...recurrence });
-      const nextDate = rule.after(previousDate);
-      if (nextDate) {
-        await scheduleReminder(title, nextDate, listKey);
-      }
-    },
-    [scheduleReminder]
   );
 
   const addTask = useCallback(
@@ -75,7 +105,12 @@ export default function useTasks(
 
       let notificationId: string | undefined;
       if (dueDate) {
-        notificationId = await scheduleReminder(title.trim(), dueDate, listKey);
+        notificationId = await scheduleReminder(
+          title.trim(),
+          dueDate,
+          listKey,
+          recurrence
+        );
       }
 
       const task: Task = {
@@ -94,7 +129,7 @@ export default function useTasks(
       setTasks((prev) => [...prev, task]);
       return task;
     },
-    [setTasks, scheduleReminder, scheduleNextOccurrence]
+    [setTasks, scheduleReminder]
   );
 
   const toggleTask = useCallback(
