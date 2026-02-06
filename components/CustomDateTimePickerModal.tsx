@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react";
 import {
-  Modal,
   View,
   Pressable,
   Text,
   useColorScheme,
   Platform,
+  StyleSheet,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAppStore } from "../store/appStore";
@@ -46,33 +46,15 @@ export default function CustomDateTimePickerModal({
     }
   }, [visible, date]);
 
+  if (!visible) return null;
+
   return (
-    <Modal
-      transparent
-      visible={visible}
-      animationType="fade"
-      presentationStyle="overFullScreen"
-      onRequestClose={onCancel}
-    >
-      <Pressable
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(0,0,0,0.3)",
-          justifyContent: "center",
-          paddingTop: 24,
-          paddingHorizontal: 24,
-          paddingBottom: 48,
-        }}
-        onPress={onCancel}
-      >
+    <View style={styles.overlay}>
+      <Pressable style={styles.backdrop} onPress={onCancel} />
+      <View style={styles.center}>
         <Pressable
           onPress={() => {}}
-          style={{
-            backgroundColor: background,
-            borderRadius: 12,
-            padding: 16,
-            elevation: 5,
-          }}
+          style={[styles.card, { backgroundColor: background }]}
         >
           <View style={{ marginBottom: 8 }}>
             <DateTimePicker
@@ -127,7 +109,30 @@ export default function CustomDateTimePickerModal({
             <Text style={{ color: "#007aff", fontSize: 16 }}>{t("save")}</Text>
           </Pressable>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  center: {
+    flex: 1,
+    justifyContent: "center",
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+  },
+  card: {
+    borderRadius: 12,
+    padding: 16,
+    elevation: 5,
+  },
+});

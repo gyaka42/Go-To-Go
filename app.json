@@ -3,7 +3,7 @@
     "name": "Go-To-Go Task!",
     "slug": "todos-app",
     "assetBundlePatterns": ["assets/**/*"],
-    "version": "1.3.1",
+    "version": "1.3.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",

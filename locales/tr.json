@@ -56,5 +56,13 @@
   "error": "Hata",
   "recurrenceNeedsDate": "Tekrarlama ayarlamadan önce lütfen bir tarih ve saat ekleyin.",
   "taskReminderTitle": "Görev hatırlatıcısı",
-  "taskReminderBody": "\"{{task}}\" görevi için \"{{list}}\" listesinde hatırlatma"
+  "taskReminderBody": "\"{{task}}\" görevi için \"{{list}}\" listesinde hatırlatma",
+  "listReminders": "List reminders",
+  "addReminder": "Add reminder",
+  "reminder": "Reminder",
+  "tags": "Tags",
+  "noTag": "No tag",
+  "listReminderTitle": "List reminder",
+  "listReminderBody": "Reminder for \"{{label}}\" in list \"{{list}}\"",
+  "saveListFirst": "Save the list first to add reminders."
 }

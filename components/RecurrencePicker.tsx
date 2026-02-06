@@ -6,13 +6,10 @@ import {
   TouchableOpacity,
   Modal,
   Button,
-  TextInput,
   StyleSheet,
-  Switch,
 } from "react-native";
 import { RRule, Options as RRuleOptions, Frequency } from "rrule";
 import { useAppStore } from "../store/appStore";
-import useModalQueue from "../utils/useModalQueue";
 
 type Props = {
   initial?: Partial<RRuleOptions>;
@@ -37,18 +34,8 @@ export default function RecurrencePicker({
     t("sa"),
     t("su"),
   ];
-  const [menuVisible, setMenuVisible] = useState(false);
-  const [customVisible, setCustomVisible] = useState(false);
-
-  const closeAllModals = () => {
-    cancelModalQueue();
-    setMenuVisible(false);
-    setCustomVisible(false);
-  };
-
-  const [openWithQueue, cancelModalQueue] = useModalQueue(
-    [() => menuVisible, () => customVisible],
-    closeAllModals
+  const [activeSheet, setActiveSheet] = useState<"menu" | "custom" | null>(
+    null
   );
 
   const [interval, setInterval] = useState(String(initial?.interval ?? 1));
@@ -67,7 +54,6 @@ export default function RecurrencePicker({
   }, [initial]);
 
   const scheme = useAppStore((s) => s.scheme);
-  const setMode = useAppStore((s) => s.setMode);
 
   // Herleid label
   const deriveType = (
@@ -100,8 +86,7 @@ export default function RecurrencePicker({
 
   // Presets
   const handlePreset = (t: "none" | "daily" | "weekly" | "monthly") => {
-    cancelModalQueue();
-    setMenuVisible(false);
+    setActiveSheet(null);
     if (t === "none") {
       setOptsState(undefined);
       return onChange(undefined);
@@ -130,9 +115,7 @@ export default function RecurrencePicker({
     const customOpts = { freq, interval: Number(interval) || 1, byweekday };
     setOptsState(customOpts);
     onChange(customOpts);
-    cancelModalQueue();
-    setCustomVisible(false);
-    setMenuVisible(false);
+    setActiveSheet(null);
   };
 
   return (
@@ -150,7 +133,7 @@ export default function RecurrencePicker({
           },
           style,
         ]}
-        onPress={() => openWithQueue(() => setMenuVisible(true))}
+        onPress={() => setActiveSheet("menu")}
       >
         {iconOnly ? (
           <Ionicons name="repeat" size={18} color="#2563EB" />
@@ -166,160 +149,155 @@ export default function RecurrencePicker({
         )}
       </TouchableOpacity>
 
-      <Modal
-        visible={menuVisible}
-        transparent
-        presentationStyle="overFullScreen"
-      >
-        <View style={styles.backdrop}>
-          <View
-            style={[
-              styles.modal,
-              { backgroundColor: scheme === "dark" ? "#222" : "#fff" },
-            ]}
-          >
-            <Button
-              title={t("noRepeat")}
-              onPress={() => handlePreset("none")}
+      {activeSheet && (
+        <Modal
+          visible={activeSheet !== null}
+          transparent
+          animationType="fade"
+          presentationStyle="overFullScreen"
+          onRequestClose={() => setActiveSheet(null)}
+        >
+          <View style={styles.backdrop}>
+            <TouchableOpacity
+              style={StyleSheet.absoluteFill}
+              onPress={() => setActiveSheet(null)}
             />
-            <Button title={t("daily")} onPress={() => handlePreset("daily")} />
-            <Button
-              title={t("weekly")}
-              onPress={() => handlePreset("weekly")}
-            />
-            <Button
-              title={t("monthly")}
-              onPress={() => handlePreset("monthly")}
-            />
-            <Button
-              title={t("custom")}
-              onPress={() => openWithQueue(() => setCustomVisible(true))}
-            />
-            <Button
-              title={t("close")}
-              onPress={() => {
-                cancelModalQueue();
-                setMenuVisible(false);
-              }}
-            />
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={customVisible}
-        transparent
-        presentationStyle="overFullScreen"
-      >
-        <View style={styles.backdrop}>
-          <View
-            style={[
-              styles.modal,
-              { backgroundColor: scheme === "dark" ? "#222" : "#fff" },
-            ]}
-          >
-            <Text
-              style={{
-                color: scheme === "dark" ? "#fff" : "#000",
-                marginBottom: 8,
-              }}
+            <View
+              style={[
+                styles.modal,
+                { backgroundColor: scheme === "dark" ? "#222" : "#fff" },
+              ]}
             >
-              {t("interval")}
-            </Text>
-            <View style={styles.intervalRow}>
-              <TouchableOpacity
-                style={[
-                  styles.intervalButton,
-                  {
-                    backgroundColor: scheme === "dark" ? "#333" : "#f2f2f2",
-                    borderColor: scheme === "dark" ? "#444" : "#ccc",
-                  },
-                ]}
-                onPress={() =>
-                  setInterval((prev) => {
-                    const val = Math.max(1, Number(prev) - 1);
-                    return String(val);
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.intervalText,
-                    { color: scheme === "dark" ? "#9CA3AF" : "#6B7280" },
-                  ]}
-                >
-                  -
-                </Text>
-              </TouchableOpacity>
-              <Text
-                style={[
-                  styles.intervalText,
-                  { color: scheme === "dark" ? "#fff" : "#333" },
-                ]}
-              >
-                {interval}
-              </Text>
-              <TouchableOpacity
-                style={[
-                  styles.intervalButton,
-                  {
-                    backgroundColor: scheme === "dark" ? "#333" : "#f2f2f2",
-                    borderColor: scheme === "dark" ? "#444" : "#ccc",
-                  },
-                ]}
-                onPress={() =>
-                  setInterval((prev) => {
-                    const val = Number(prev) + 1;
-                    return String(val);
-                  })
-                }
-              >
-                <Text
-                  style={[
-                    styles.intervalText,
-                    { color: scheme === "dark" ? "#9CA3AF" : "#6B7280" },
-                  ]}
-                >
-                  +
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.daysRow}>
-              {dayLabels.map((l, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[
-                    styles.dayButton,
-                    byweekday.includes(i) && styles.dayButtonSelected,
-                  ]}
-                  onPress={() => toggleDay(i)}
-                >
+              {activeSheet === "menu" && (
+                <>
+                  <Button
+                    title={t("noRepeat")}
+                    onPress={() => handlePreset("none")}
+                  />
+                  <Button
+                    title={t("daily")}
+                    onPress={() => handlePreset("daily")}
+                  />
+                  <Button
+                    title={t("weekly")}
+                    onPress={() => handlePreset("weekly")}
+                  />
+                  <Button
+                    title={t("monthly")}
+                    onPress={() => handlePreset("monthly")}
+                  />
+                  <Button
+                    title={t("custom")}
+                    onPress={() => setActiveSheet("custom")}
+                  />
+                  <Button title={t("close")} onPress={() => setActiveSheet(null)} />
+                </>
+              )}
+
+              {activeSheet === "custom" && (
+                <>
                   <Text
-                    style={[
-                      byweekday.includes(i)
-                        ? styles.dayButtonTextSelected
-                        : { color: scheme === "dark" ? "#fff" : "#333" },
-                    ]}
+                    style={{
+                      color: scheme === "dark" ? "#fff" : "#000",
+                      marginBottom: 8,
+                    }}
                   >
-                    {l}
+                    {t("interval")}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <View style={styles.row}>
-              <Button
-                title={t("cancel")}
-                color="#2563EB"
-                onPress={() => {
-                  cancelModalQueue();
-                  setCustomVisible(false);
-                }}
-              />
-              <Button title={t("save")} color="#2563EB" onPress={saveCustom} />
+                  <View style={styles.intervalRow}>
+                    <TouchableOpacity
+                      style={[
+                        styles.intervalButton,
+                        {
+                          backgroundColor: scheme === "dark" ? "#333" : "#f2f2f2",
+                          borderColor: scheme === "dark" ? "#444" : "#ccc",
+                        },
+                      ]}
+                      onPress={() =>
+                        setInterval((prev) => {
+                          const val = Math.max(1, Number(prev) - 1);
+                          return String(val);
+                        })
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.intervalText,
+                          { color: scheme === "dark" ? "#9CA3AF" : "#6B7280" },
+                        ]}
+                      >
+                        -
+                      </Text>
+                    </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.intervalText,
+                        { color: scheme === "dark" ? "#fff" : "#333" },
+                      ]}
+                    >
+                      {interval}
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.intervalButton,
+                        {
+                          backgroundColor: scheme === "dark" ? "#333" : "#f2f2f2",
+                          borderColor: scheme === "dark" ? "#444" : "#ccc",
+                        },
+                      ]}
+                      onPress={() =>
+                        setInterval((prev) => {
+                          const val = Number(prev) + 1;
+                          return String(val);
+                        })
+                      }
+                    >
+                      <Text
+                        style={[
+                          styles.intervalText,
+                          { color: scheme === "dark" ? "#9CA3AF" : "#6B7280" },
+                        ]}
+                      >
+                        +
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.daysRow}>
+                    {dayLabels.map((l, i) => (
+                      <TouchableOpacity
+                        key={i}
+                        style={[
+                          styles.dayButton,
+                          byweekday.includes(i) && styles.dayButtonSelected,
+                        ]}
+                        onPress={() => toggleDay(i)}
+                      >
+                        <Text
+                          style={[
+                            byweekday.includes(i)
+                              ? styles.dayButtonTextSelected
+                              : { color: scheme === "dark" ? "#fff" : "#333" },
+                          ]}
+                        >
+                          {l}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={styles.row}>
+                    <Button
+                      title={t("cancel")}
+                      color="#2563EB"
+                      onPress={() => setActiveSheet(null)}
+                    />
+                    <Button title={t("save")} color="#2563EB" onPress={saveCustom} />
+                  </View>
+                </>
+              )}
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      )}
     </>
   );
 }

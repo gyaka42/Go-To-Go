@@ -56,5 +56,13 @@
   "error": "Fout",
   "recurrenceNeedsDate": "Voeg eerst een datum en tijd toe voordat je een herhaling instelt.",
   "taskReminderTitle": "Taakherinnering",
-  "taskReminderBody": "Herinnering voor \"{{task}}\" in lijst \"{{list}}\""
+  "taskReminderBody": "Herinnering voor \"{{task}}\" in lijst \"{{list}}\"",
+  "listReminders": "Lijstherinneringen",
+  "addReminder": "Herinnering toevoegen",
+  "reminder": "Herinnering",
+  "tags": "Labels",
+  "noTag": "Geen label",
+  "listReminderTitle": "Lijstherinnering",
+  "listReminderBody": "Herinnering voor \"{{label}}\" in lijst \"{{list}}\"",
+  "saveListFirst": "Sla de lijst eerst op om herinneringen toe te voegen."
 }

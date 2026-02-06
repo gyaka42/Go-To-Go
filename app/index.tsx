@@ -12,7 +12,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Modal,
+  ScrollView,
 } from "react-native";
 
 import DraggableFlatList, {
@@ -31,6 +31,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { MaterialIcons as Icon } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import { TAGS } from "../utils/tags";
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -59,6 +60,7 @@ export default function HomeScreen() {
 
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string>("__all__");
 
   const navigation = useNavigation();
   const mode = useAppStore((s) => s.mode);
@@ -86,6 +88,17 @@ export default function HomeScreen() {
     ...order.map((key) => combined.find((i) => i.key === key)).filter(Boolean),
     ...combined.filter((i) => !order.includes(i.key)),
   ];
+
+  const filteredCombined =
+    tagFilter === "__all__"
+      ? orderedCombined
+      : orderedCombined.filter((item) => {
+          const tasks = tasksMap[item.key] ?? [];
+          if (tagFilter === "__none__") {
+            return tasks.some((t) => !t.tag);
+          }
+          return tasks.some((t) => t.tag === tagFilter);
+        });
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -218,6 +231,13 @@ export default function HomeScreen() {
         Notifications.cancelScheduledNotificationAsync(t.notificationId);
       }
     });
+    // Cancel any scheduled list reminders
+    const listToDelete = lists.find((l) => l.key === key);
+    listToDelete?.reminders?.forEach((r) => {
+      r.notificationIds?.forEach((id) => {
+        Notifications.cancelScheduledNotificationAsync(id);
+      });
+    });
 
     // Remove the list and its tasks via the store's removeList method
     useAppStore.getState().removeList(key);
@@ -301,9 +321,69 @@ export default function HomeScreen() {
         </Text>
       </View>
 
+      <View style={styles.tagFilterContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 12 }}
+        >
+          <TouchableOpacity
+            onPress={() => setTagFilter("__all__")}
+            style={[
+              styles.tagChip,
+              tagFilter === "__all__" && styles.tagChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.tagChipText,
+                tagFilter === "__all__" && styles.tagChipTextActive,
+              ]}
+            >
+              {t("filterAll")}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTagFilter("__none__")}
+            style={[
+              styles.tagChip,
+              tagFilter === "__none__" && styles.tagChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.tagChipText,
+                tagFilter === "__none__" && styles.tagChipTextActive,
+              ]}
+            >
+              {t("noTag")}
+            </Text>
+          </TouchableOpacity>
+          {TAGS.map((tag) => (
+            <TouchableOpacity
+              key={tag}
+              onPress={() => setTagFilter(tag)}
+              style={[
+                styles.tagChip,
+                tagFilter === tag && styles.tagChipActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.tagChipText,
+                  tagFilter === tag && styles.tagChipTextActive,
+                ]}
+              >
+                {tag}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
       {/* DraggableFlatList met alle kaarten */}
       <DraggableFlatList
-        data={orderedCombined}
+        data={filteredCombined}
         keyExtractor={(item) => item.key}
         onDragEnd={({ data }) => {
           const newOrder = data.map((i) => i.key);
@@ -374,22 +454,14 @@ export default function HomeScreen() {
         </View>
       </View>
       {langMenuVisible && (
-          <Modal
-            transparent
-            animationType="fade"
-            presentationStyle="overFullScreen"
-            onRequestClose={() => {
+        <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <TouchableOpacity
+            style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.3)" }]}
+            onPress={() => {
               cancelModalQueue();
               setLangMenuVisible(false);
             }}
-          >
-            <TouchableOpacity
-              style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}
-              onPress={() => {
-                cancelModalQueue();
-                setLangMenuVisible(false);
-              }}
-            />
+          />
           <View
             style={{
               position: "absolute",
@@ -415,7 +487,7 @@ export default function HomeScreen() {
                 }}
                 onPress={() => {
                   setLang(code as any);
-                   cancelModalQueue();
+                  cancelModalQueue();
                   setLangMenuVisible(false);
                 }}
               >
@@ -438,7 +510,7 @@ export default function HomeScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </Modal>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -464,6 +536,29 @@ const styles = StyleSheet.create({
   subtitleText: {
     fontSize: 12,
     color: "#6B7280",
+  },
+  tagFilterContainer: {
+    marginBottom: 8,
+  },
+  tagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    marginRight: 8,
+    backgroundColor: "#F8FAFC",
+  },
+  tagChipActive: {
+    backgroundColor: "#2563EB",
+    borderColor: "#2563EB",
+  },
+  tagChipText: {
+    fontSize: 12,
+    color: "#0F172A",
+  },
+  tagChipTextActive: {
+    color: "#FFF",
   },
   card: {
     marginHorizontal: 12,

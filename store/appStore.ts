@@ -23,6 +23,7 @@ export interface Task {
   titleEditable: boolean;
   recurrence?: Partial<RRuleOptions>;
   listKey: string;
+  tag?: string | null;
 }
 
 export interface ListItem {
@@ -30,11 +31,24 @@ export interface ListItem {
   icon: string;
   label: string;
   count: number | null;
+  reminders?: ListReminder[];
 }
 
 const translations: Record<Lang, any> = { en, nl, tr, de, es, fr };
 
 export type ThemeMode = ColorSchemeName | "light" | "dark" | "system";
+
+const DEFAULT_LIST_KEYS = ["mijnDag", "belangrijk", "gepland", "taken"];
+
+export interface ListReminder {
+  id: string;
+  label: string;
+  hour: number;
+  minute: number;
+  daysOfWeek: number[]; // 0=Sun ... 6=Sat
+  enabled: boolean;
+  notificationIds?: string[];
+}
 
 interface AppState {
   lists: ListItem[];
@@ -50,6 +64,7 @@ interface AppState {
   setMode: (mode: ThemeMode) => void;
   setLang: (lang: Lang) => void;
   setPendingNotificationId: (id: string | null) => void;
+  setListReminders: (key: string, reminders: ListReminder[]) => void;
   t: (key: string, vars?: Record<string, string>) => string;
   findListLabel: (key: string) => string;
   removeList: (key: string) => void;
@@ -68,13 +83,14 @@ export const useAppStore = create<AppState>()(
       setActiveListKey: (key) => set({ activeListKey: key }),
       setLists: (newLists) => {
         const safeLists = Array.isArray(newLists) ? newLists : [];
-        const unique = [
-          ...new Map(
-            safeLists
-              .filter((l) => l && typeof l.key === "string")
-              .map((l) => [l.key, l])
-          ).values(),
-        ];
+        const currentDefaults = get().lists.filter(
+          (l) => DEFAULT_LIST_KEYS.includes(l.key) && l.reminders?.length
+        );
+        const cleaned = safeLists.filter(
+          (l) => l && typeof l.key === "string" && !DEFAULT_LIST_KEYS.includes(l.key)
+        );
+        const combined = [...currentDefaults, ...cleaned];
+        const unique = [...new Map(combined.map((l) => [l.key, l])).values()];
         set({ lists: unique });
       },
       setTasksMap: (map) => {
@@ -137,6 +153,23 @@ export const useAppStore = create<AppState>()(
         })();
       },
       setPendingNotificationId: (id) => set({ pendingNotificationId: id }),
+      setListReminders: (key, reminders) => {
+        const current = get().lists;
+        const exists = current.some((l) => l.key === key);
+        const updated = exists
+          ? current.map((l) => (l.key === key ? { ...l, reminders } : l))
+          : [
+              ...current,
+              {
+                key,
+                icon: "list",
+                label: key,
+                count: null,
+                reminders,
+              },
+            ];
+        set({ lists: updated });
+      },
       t: (key, vars) => {
         let str = translations[get().lang][key] ?? key;
         if (vars) {

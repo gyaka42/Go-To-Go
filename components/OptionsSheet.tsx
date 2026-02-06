@@ -8,6 +8,7 @@ interface Props {
   onClose: () => void;
   onSortAlphabetical: () => void;
   onSortByDate: () => void;
+  onListReminders: () => void;
   onCopy: () => void;
   onPrint: () => void;
   style?: any;
@@ -17,6 +18,7 @@ export default function OptionsSheet({
   onClose,
   onSortAlphabetical,
   onSortByDate,
+  onListReminders,
   onCopy,
   onPrint,
   style,
@@ -45,6 +47,12 @@ export default function OptionsSheet({
         <Ionicons name="calendar" size={24} color={iconColor} />
         <Text style={[styles.rowText, { color: textColor }]}>
           {t("sortDate")}
+        </Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.row} onPress={onListReminders}>
+        <Ionicons name="alarm-outline" size={24} color={iconColor} />
+        <Text style={[styles.rowText, { color: textColor }]}>
+          {t("listReminders")}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.row} onPress={onCopy}>

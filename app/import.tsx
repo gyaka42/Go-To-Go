@@ -10,9 +10,7 @@ export default function ImportScreen() {
     tasks?: string;
   }>();
   const router = useRouter();
-  const lists = useAppStore((s) => s.lists);
   const setLists = useAppStore((s) => s.setLists);
-  const tasksMap = useAppStore((s) => s.tasksMap);
   const setTasksMap = useAppStore((s) => s.setTasksMap);
 
   useEffect(() => {
@@ -30,11 +28,12 @@ export default function ImportScreen() {
           icon: "list",
           label: title as string,
           count: parsedTasks.length,
+          reminders: [],
         };
         // Voeg de nieuwe lijst toe aan de bestaande lijsten
-        setLists([...lists, newList]);
+        setLists([...useAppStore.getState().lists, newList]);
         // Voeg de parsedTasks toe aan de tasksMap onder de nieuwe key
-        setTasksMap({ ...tasksMap, [key]: parsedTasks });
+        setTasksMap({ ...useAppStore.getState().tasksMap, [key]: parsedTasks });
         // Navigeer naar de detailpagina van de nieuwe lijst
         router.replace(`/list/${key}`);
       } catch (error) {

@@ -56,5 +56,13 @@
   "error": "Fehler",
   "recurrenceNeedsDate": "Bitte zuerst ein Datum und eine Uhrzeit hinzufügen, bevor du eine Wiederholung einstellst.",
   "taskReminderTitle": "Aufgabenerinnerung",
-  "taskReminderBody": "Erinnerung für \"{{task}}\" in Liste \"{{list}}\""
+  "taskReminderBody": "Erinnerung für \"{{task}}\" in Liste \"{{list}}\"",
+  "listReminders": "List reminders",
+  "addReminder": "Add reminder",
+  "reminder": "Reminder",
+  "tags": "Tags",
+  "noTag": "No tag",
+  "listReminderTitle": "List reminder",
+  "listReminderBody": "Reminder for \"{{label}}\" in list \"{{list}}\"",
+  "saveListFirst": "Save the list first to add reminders."
 }

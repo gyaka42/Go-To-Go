@@ -41,6 +41,7 @@ function InnerLayout() {
   }, [activeListKey, tasks]);
 
   useEffect(() => {
+    const handledNotifIds = new Set<string>();
     (async () => {
       // Vraag eerst notificatie-permissies
       const { status } = await Notifications.getPermissionsAsync();
@@ -61,6 +62,10 @@ function InnerLayout() {
 
       // Handle taps on scheduled notifications with robust logging
       Notifications.addNotificationResponseReceivedListener((response) => {
+        const notifId = response.notification.request.identifier;
+        if (handledNotifIds.has(notifId)) return;
+        handledNotifIds.add(notifId);
+
         __DEV__ && console.log(
           "🔔 Notificatie response ontvangen:",
           JSON.stringify(response, null, 2)
@@ -75,7 +80,6 @@ function InnerLayout() {
 
         const { listKey } = data;
         if (listKey) {
-          const notifId = notification.request.identifier;
           // Replace current route instead of pushing a new one,
           // so you don't get duplicate list screens in the history.
           router.replace(`/list/${listKey}?notif=${notifId}`);

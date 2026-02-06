@@ -98,6 +98,7 @@ export default function useTasks(
     async (
       title: string,
       dueDate: Date | null,
+      tag: string | null,
       listKey?: string,
       recurrence?: Partial<RRuleOptions>
     ): Promise<Task | undefined> => {
@@ -122,6 +123,7 @@ export default function useTasks(
         titleEditable: true,
         recurrence,
         listKey: listKey ?? "", // fallback to empty string if undefined
+        tag: tag ?? null,
         ...(dueDate || recurrence ? { highlight: true } : {}),
       };
       __DEV__ && console.log("🆔 Nieuwe taak-ID:", task.id);

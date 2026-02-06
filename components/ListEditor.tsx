@@ -12,9 +12,7 @@ import {
   TextInput,
   Pressable,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   SafeAreaView,
-  Modal,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -43,7 +41,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 
-import { Task, useAppStore } from '../store/appStore';
+import { ListReminder, Task, useAppStore } from '../store/appStore';
 
 // Random color generator for new lists
 const randomColor = () => {
@@ -81,7 +79,7 @@ import ShareModal from "../app/new-list/share";
 import RecurrencePicker from "../components/RecurrencePicker";
 import { Options as RRuleOptions, Frequency } from "rrule";
 import { useBaseMenu } from "../utils/menuDefaults";
-import useModalQueue from "../utils/useModalQueue";
+import { TAGS } from "../utils/tags";
 
 function getRecurrenceLabel(
   recurrence?: Partial<RRuleOptions>,
@@ -147,16 +145,38 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   };
   
   const [draftTask, setDraftTask] = useState<{ dueDate?: Date } | null>(null);
-  const handleConfirm = (date: Date) => {
+  const handleConfirm = async (date: Date) => {
     setDueDate(date); // laat deze staan als je wil dat het huidige inputveld visueel update
     setShowDatePickerModal(false);
 
     if (selectedTask) {
+      if (selectedTask.notificationId) {
+        await Notifications.cancelScheduledNotificationAsync(
+          selectedTask.notificationId
+        );
+      }
+      const trigger = buildTaskTrigger(date, selectedTask.recurrence);
+      const { findListLabel, t } = useAppStore.getState();
+      const listLabel =
+        findListLabel?.(selectedTask.listKey) ?? "Unknown list";
+      const newNotificationId = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t("taskReminderTitle"),
+          body: t("taskReminderBody", {
+            task: selectedTask.title,
+            list: listLabel,
+          }),
+          sound: true,
+        },
+        trigger,
+      });
       const updatedTasks = tasks.map((t) =>
-        t.id === selectedTask.id ? { ...t, dueDate: date } : t
+        t.id === selectedTask.id
+          ? { ...t, dueDate: date, notificationId: newNotificationId }
+          : t
       );
       setTasks(updatedTasks);
-        } else {
+    } else {
       setNewTaskDueDate(date);
     }
   };
@@ -211,6 +231,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const scheme = useAppStore((s) => s.scheme);
   const lang = useAppStore((s) => s.lang);
   const t = useAppStore((s) => s.t);
+  const findListLabel = useAppStore((s) => s.findListLabel);
   const localeMap: Record<string, string> = {
     en: "en-US",
     nl: "nl-NL",
@@ -245,6 +266,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   // Shared state
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTask, setNewTask] = useState("");
+  const [newTaskTag, setNewTaskTag] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<Date | null>(null);
   const [recurrence, setRecurrence] = useState<
     Partial<RRuleOptions> | undefined
@@ -256,6 +278,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const setLists = useAppStore((s) => s.setLists);
   const tasksMap = useAppStore((s) => s.tasksMap);
   const setTasksMap = useAppStore((s) => s.setTasksMap);
+  const setListReminders = useAppStore((s) => s.setListReminders);
 
   // Title (for create mode)
   const [title, setTitle] = useState(titleLabel || "");
@@ -281,10 +304,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   useFocusEffect(
     React.useCallback(() => {
       return () => {
-        cancelModalQueue();
-        setShowOptions(false);
-        setShowShare(false);
-        setShowShareModal(false);
+        setActiveSheet(null);
+        setReminderTimeTemp(null);
         setShowDatePickerModal(false);
         setShowDatePicker(false);
         setDatePickerFor(null);
@@ -294,34 +315,32 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     }, [])
   );
 
-  // Options sheet / share modal
-  const [showOptions, setShowOptions] = useState(false);
-  const [showShare, setShowShare] = useState(false);
-  const [showShareModal, setShowShareModal] = useState(false);
-
-  const closeAllModals = () => {
-    cancelModalQueue();
-    setShowOptions(false);
-    setShowShare(false);
-    setShowShareModal(false);
-    setShowDatePickerModal(false);
-  };
-
-  const [openWithQueue, cancelModalQueue] = useModalQueue(
-    [
-      () => showOptions,
-      () => showShare,
-      () => showShareModal,
-      () => showDatePickerModal,
-    ],
-    closeAllModals
+  // Unified modal state (avoid stacked modals + flicker)
+  const [activeSheet, setActiveSheet] = useState<
+    | "options"
+    | "share"
+    | "tagPicker"
+    | "reminders"
+    | "reminderTime"
+    | null
+  >(null);
+  const [tagPickerForTaskId, setTagPickerForTaskId] = useState<string | null>(
+    null
   );
+  const [remindersDraft, setRemindersDraft] = useState<ListReminder[]>([]);
+  const remindersInitializedRef = useRef(false);
+  const remindersListKeyRef = useRef<string | null>(null);
+  const [editingReminderId, setEditingReminderId] = useState<string | null>(
+    null
+  );
+  const [reminderTimeTemp, setReminderTimeTemp] = useState<Date | null>(null);
 
   // Handler voor kalenderknop bij nieuwe taak
   const handleNewTaskCalendarPress = () => {
     setSelectedTask(null);
     setNewTaskDueDate((prev) => prev ?? new Date());
-    openWithQueue(() => setShowDatePickerModal(true));
+    setActiveSheet(null);
+    setShowDatePickerModal(true);
   };
 
   // For edit mode, get list key from params if not provided
@@ -407,92 +426,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     }
   }, [tasks]);
 
-  // Listen for notification taps and schedule next recurrence
+  // Listen for notification taps globally in app/_layout.tsx
   const pendingNotificationRef: React.MutableRefObject<Notifications.NotificationResponse | null> =
     useRef<Notifications.NotificationResponse | null>(null);
-  useEffect(() => {
-    __DEV__ && console.log(
-      "🔁 useEffect voor notificaties her-rendered met taken:",
-      tasks.length
-    );
-    if (!activeListKey) return;
-
-    __DEV__ && console.log(
-      "🔄 useEffect triggered voor notification response listener met activeListKey:",
-      activeListKey
-    );
-
-    const listener = async (
-      notification: Notifications.NotificationResponse
-    ) => {
-      __DEV__ && console.log(
-        "🔔 Notificatie response ontvangen:",
-        JSON.stringify(notification, null, 2)
-      );
-      // --- BEGIN Debugging output for notificationId existence in tasks ---
-      const tappedNotifId = notification.notification.request.identifier;
-      // 🆕 Sla notificationId op in state
-      __DEV__ && console.log("🔔 Notificatie-ID ontvangen:", tappedNotifId);
-      setPendingNotificationId(tappedNotifId);
-      // --- END Nieuw toegevoegd ---
-      const taskExists = tasks.some((t) => t.notificationId === tappedNotifId);
-      __DEV__ && console.log("🔎 Bestaat de taak met dit notificationId?", taskExists);
-      if (!taskExists) {
-        __DEV__ && console.log("❌ Geen bijpassende taak gevonden voor deze notificatie.");
-      } else {
-        __DEV__ && console.log("✅ Taak gevonden voor deze notificatie.");
-      }
-      // --- END Debugging output ---
-
-      // Altijd pendingNotificationRef zetten zodra notificatie ontvangen wordt
-      if (notification?.notification?.request?.identifier) {
-        pendingNotificationRef.current = notification;
-      } else {
-        __DEV__ && console.log(
-          "⚠️ Notificatie zonder geldige identifier ontvangen:",
-          notification
-        );
-      }
-      // --- [ScrollTest] Add logging after setting pendingNotificationRef.current ---
-      __DEV__ && console.log(
-        "📦 [ScrollTest] Geregistreerde notificatie-ID:",
-        tappedNotifId
-      );
-      __DEV__ && console.log(
-        "📦 [ScrollTest] Takenlijst op dat moment:",
-        tasks.map((t) => ({ id: t.id, notifId: t.notificationId }))
-      );
-      // --- [End ScrollTest] ---
-      __DEV__ && console.log("📦 pendingNotificationRef gezet op:", tappedNotifId);
-
-      // Extract and guard the notification's listKey value
-      const listKeyParam =
-        notification.notification.request.content.data?.listKey;
-      if (typeof listKeyParam === "string" && listKeyParam !== activeListKey) {
-        router.replace(`/list/${listKeyParam}?notif=${tappedNotifId}`);
-        return; // stop further handling on the old list
-      }
-
-      if (tasks.length === 0 || !taskExists) {
-        __DEV__ && console.log(
-          "⚠️ Tasks nog niet geladen of taak onbekend. Sla response tijdelijk op."
-        );
-        setPendingTrigger((prev) => prev + 1);
-        return;
-      }
-
-      handleNotificationResponse(notification);
-    };
-
-    const subscription =
-      Notifications.addNotificationResponseReceivedListener(listener);
-    __DEV__ && console.log("📣 Notification response listener geregistreerd (eenmalig).");
-
-    return () => {
-      subscription.remove();
-      __DEV__ && console.log("📴 Notification response listener verwijderd.");
-    };
-  }, [activeListKey, tasks]);
 
   // Fallback: check initial notification on mount
   useEffect(() => {
@@ -744,7 +680,13 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         // Add the new list item
         setLists([
           ...useAppStore.getState().lists,
-          { key, icon: "format-list-bulleted", label, count: tasks.length },
+          {
+            key,
+            icon: "format-list-bulleted",
+            label,
+            count: tasks.length,
+            reminders: [],
+          },
         ]);
         // Store its tasks
         setTasksMap({ ...useAppStore.getState().tasksMap, [key]: tasks });
@@ -783,6 +725,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         selectedTask && selectedTask.dueDate !== undefined
           ? selectedTask.dueDate
           : dueDate ?? newTaskDueDate ?? null,
+        newTaskTag,
         listKeyToUse,
         recurrence
       );
@@ -799,6 +742,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       setRecurrence(undefined);
       setDraftTask(null);
       setNewTaskDueDate(null);
+      setNewTaskTag(null);
       if (
         createdTask &&
         (createdTask.dueDate ||
@@ -853,7 +797,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       ),
       headerRight: () => (
         <TouchableOpacity
-          onPress={() => openWithQueue(() => setShowOptions(true))}
+          onPress={() => setActiveSheet("options")}
           style={{ marginRight: 16 }}
         >
           <Ionicons
@@ -879,8 +823,161 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     }
   }, [activeList]);
 
+  useEffect(() => {
+    if (activeSheet === "reminders") {
+      const listKey = activeListKey ?? null;
+      if (
+        !remindersInitializedRef.current ||
+        remindersListKeyRef.current !== listKey
+      ) {
+        setRemindersDraft(activeList?.reminders ?? []);
+        remindersInitializedRef.current = true;
+        remindersListKeyRef.current = listKey;
+      }
+    }
+  }, [activeSheet, activeList, activeListKey]);
+
   // Compute a flag for default lists
   const isDefaultList = baseMenu.some((m) => m.key === activeListKey);
+
+  const dayLabels = [
+    t("su"),
+    t("mo"),
+    t("tu"),
+    t("we"),
+    t("th"),
+    t("fr"),
+    t("sa"),
+  ];
+
+  const formatTime = (hour: number, minute: number) =>
+    `${hour.toString().padStart(2, "0")}:${minute
+      .toString()
+      .padStart(2, "0")}`;
+
+  const makeReminderLabel = (hour: number, minute: number) =>
+    `${t("reminder")} ${formatTime(hour, minute)}`;
+
+  const createDefaultReminder = (): ListReminder => ({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    label: makeReminderLabel(9, 0),
+    hour: 9,
+    minute: 0,
+    daysOfWeek: [1, 2, 3, 4, 5],
+    enabled: true,
+    notificationIds: [],
+  });
+
+  const scheduleListReminders = async (
+    listKey: string,
+    reminders: ListReminder[]
+  ) => {
+    const listLabel = findListLabel(listKey);
+    // Cancel existing scheduled notifications
+    const existing = activeList?.reminders ?? [];
+    for (const r of existing) {
+      if (Array.isArray(r.notificationIds)) {
+        for (const id of r.notificationIds) {
+          try {
+            await Notifications.cancelScheduledNotificationAsync(id);
+          } catch {}
+        }
+      }
+    }
+
+    const updated: ListReminder[] = [];
+    for (const r of reminders) {
+      if (!r.enabled) {
+        updated.push({ ...r, notificationIds: [] });
+        continue;
+      }
+      const ids: string[] = [];
+      for (const day of r.daysOfWeek) {
+        const weekday = ((day % 7) + 7) % 7; // ensure 0..6
+        const notifId = await Notifications.scheduleNotificationAsync({
+          content: {
+            title: t("listReminderTitle"),
+            body: t("listReminderBody", {
+              list: listLabel,
+              label: r.label,
+            }),
+            sound: "default",
+            data: { listKey, reminderId: r.id },
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+            weekday: weekday + 1, // Expo: 1=Sunday..7=Saturday
+            hour: r.hour,
+            minute: r.minute,
+            repeats: true,
+          },
+        });
+        ids.push(notifId);
+      }
+      updated.push({ ...r, notificationIds: ids });
+    }
+    setListReminders(listKey, updated);
+  };
+
+  const buildTaskTrigger = (
+    date: Date,
+    recurrence?: Partial<RRuleOptions>
+  ): Notifications.NotificationTriggerInput => {
+    if (!recurrence) {
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date,
+      };
+    }
+    const freq = recurrence.freq;
+    const interval = recurrence.interval ?? 1;
+    if (freq === Frequency.DAILY && interval === 1) {
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        hour: date.getHours(),
+        minute: date.getMinutes(),
+        repeats: true,
+      };
+    }
+    if (
+      freq === Frequency.WEEKLY &&
+      interval === 1 &&
+      Array.isArray(recurrence.byweekday) &&
+      recurrence.byweekday.length === 1
+    ) {
+      const rruleDay = recurrence.byweekday[0];
+      let weekdayIdx: number;
+      if (typeof rruleDay === "number") {
+        weekdayIdx = rruleDay;
+      } else if (typeof rruleDay === "string") {
+        const wk = (RRule as any)[rruleDay.toUpperCase()] as Weekday;
+        weekdayIdx = wk.weekday;
+      } else {
+        weekdayIdx = (rruleDay as Weekday).weekday;
+      }
+      const weekday = ((weekdayIdx + 1) % 7) + 1; // rrule 0=Mon
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        weekday,
+        hour: date.getHours(),
+        minute: date.getMinutes(),
+        repeats: true,
+      };
+    }
+    if (freq === Frequency.MONTHLY && interval === 1) {
+      return {
+        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+        day: date.getDate(),
+        hour: date.getHours(),
+        minute: date.getMinutes(),
+        repeats: true,
+      };
+    }
+    return {
+      type: Notifications.SchedulableTriggerInputTypes.DATE,
+      date,
+    };
+  };
 
   const saveRename = () => {
     if (isDefaultList) return; // Do not allow renaming default lists
@@ -890,6 +987,44 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     );
     setLists(updatedLists);
     setRenaming(false);
+  };
+
+  const openTagPickerForTask = (taskId: string | null) => {
+    setTagPickerForTaskId(taskId);
+    setActiveSheet("tagPicker");
+  };
+
+  const applyTag = (tag: string | null) => {
+    if (tagPickerForTaskId) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === tagPickerForTaskId ? { ...t, tag } : t
+        )
+      );
+    } else {
+      setNewTaskTag(tag);
+    }
+    setActiveSheet(null);
+    setTagPickerForTaskId(null);
+  };
+
+  const updateReminder = (id: string, patch: Partial<ListReminder>) => {
+    setRemindersDraft((prev) =>
+      prev.map((r) => (r.id === id ? { ...r, ...patch } : r))
+    );
+  };
+
+  const toggleReminderDay = (id: string, day: number) => {
+    setRemindersDraft((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const exists = r.daysOfWeek.includes(day);
+        const nextDays = exists
+          ? r.daysOfWeek.filter((d) => d !== day)
+          : [...r.daysOfWeek, day];
+        return { ...r, daysOfWeek: nextDays.sort() };
+      })
+    );
   };
 
   // --- List title change handler for create mode ---
@@ -905,6 +1040,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         icon: "format-list-bulleted",
         count: 0,
         createdAt: Date.now(),
+        reminders: [],
       };
       setLists([...useAppStore.getState().lists, newList]);
       setActiveListKey(newList.key);
@@ -970,6 +1106,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     const listLabel =
       findListLabel?.(selectedTask.listKey) ?? "Unknown list";
 
+    const trigger = buildTaskTrigger(newDate, selectedTask.recurrence);
     const newNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: t("taskReminderTitle"),
@@ -979,10 +1116,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         }),
         sound: true,
       },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: newDate,
-      },
+      trigger,
     });
 
     const updatedTask = {
@@ -1233,11 +1367,23 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
               </Pressable>
             )}
             <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TouchableOpacity
+                onPress={() => openTagPickerForTask(item.id)}
+                style={{ marginRight: 8, flexDirection: "row", alignItems: "center" }}
+              >
+                <Ionicons name="pricetag-outline" size={18} color="#2563EB" />
+                {item.tag ? (
+                  <Text style={{ color: theme.secondaryText, fontSize: 12, marginLeft: 4 }}>
+                    {item.tag}
+                  </Text>
+                ) : null}
+              </TouchableOpacity>
               {(dueDateLabel || recurrenceLabel) && (
                 <TouchableOpacity
                   onPress={() => {
                     setSelectedTask(item);
-                    openWithQueue(() => setShowDatePickerModal(true));
+                    setActiveSheet(null);
+                    setShowDatePickerModal(true);
                   }}
                   style={{ marginRight: 8 }}
                 >
@@ -1369,6 +1515,23 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
               height: 24,
             }}
           />
+          <TouchableOpacity
+            onPress={() => openTagPickerForTask(null)}
+            style={{ marginLeft: 8, justifyContent: "center" }}
+          >
+            <Ionicons name="pricetag-outline" size={20} color="#2563EB" />
+          </TouchableOpacity>
+          {newTaskTag ? (
+            <Text
+              style={{
+                marginLeft: 6,
+                fontSize: 12,
+                color: theme.secondaryText,
+              }}
+            >
+              {newTaskTag}
+            </Text>
+          ) : null}
           <TouchableOpacity onPress={hookAddTask} style={styles.addBtn}>
             <Ionicons name="add-circle" size={32} color="#2563EB" />
           </TouchableOpacity>
@@ -1429,6 +1592,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                   const listLabel =
                     findListLabel?.(selectedTask.listKey) ?? "Unknown list";
 
+                  const trigger = buildTaskTrigger(
+                    finalDate,
+                    selectedTask.recurrence
+                  );
                   const newNotificationId =
                     await Notifications.scheduleNotificationAsync({
                       content: {
@@ -1439,10 +1606,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                         }),
                         sound: true,
                       },
-                      trigger: {
-                        type: Notifications.SchedulableTriggerInputTypes.DATE,
-                        date: finalDate,
-                      },
+                      trigger,
                     });
 
                   const updatedTaskWithNotif = {
@@ -1521,79 +1685,78 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           />
         </View>
 
-        {showOptions && (
-        <Modal
-          visible={showOptions}
-          transparent
-          animationType="slide"
-          presentationStyle="overFullScreen"
-          onRequestClose={() => {
-            cancelModalQueue();
-            setShowOptions(false);
-          }}
-        >
-          <View style={styles.modal}>
-            <TouchableOpacity
-              style={StyleSheet.absoluteFill}
-              onPress={() => {
-                cancelModalQueue();
-                setShowOptions(false);
-              }}
-            />
-            <OptionsSheet
-              style={styles.sheet}
-              onClose={() => {
-                cancelModalQueue();
-                setShowOptions(false);
-              }}
-              onSortAlphabetical={() => {
-                setTasks((t) =>
-                  [...t].sort((a, b) => a.title.localeCompare(b.title))
-                );
-                cancelModalQueue();
-                setShowOptions(false);
-              }}
-              onSortByDate={() => {
-                setTasks((t) =>
-                  [...t].sort((a, b) => Number(a.id) - Number(b.id))
-                );
-                cancelModalQueue();
-                setShowOptions(false);
-              }}
-              onCopy={async () => {
-                 cancelModalQueue();
-                setShowOptions(false);
-                // Build the share content: title plus task list
-                const listTitle =
-                  mode === "edit" ? activeList?.label || "" : title;
-                const taskLines = tasks
-                  .map(
-                    (task, i) =>
-                      `${i + 1}. ${task.done ? "✅" : "🔲"} ${task.title}`
-                  )
-                  .join("\n");
-                const message = `${listTitle}\n\n${taskLines}`;
-                try {
-                  if (Platform.OS === "android") {
-                    await Share.share({ message });
-                  } else {
-                    openWithQueue(() => setShowShareModal(true));
-                  }
-                } catch (e) {
-                  console.error("Share failed:", e);
-                }
-              }}
-              onPrint={async () => {
-                const listTitle =
-                  mode === "edit" ? activeList?.label || "" : title;
-                const taskLines = tasks.map(
-                  (task, i) =>
-                    `<li>${i + 1}. ${task.done ? "✅" : "🔲"} ${
-                      task.title
-                    }</li>`
-                );
+        {activeSheet && (
+          <View style={styles.overlay}>
+            <View style={styles.modal}>
+              {activeSheet === "reminderTime" ? (
+                <View style={StyleSheet.absoluteFill} />
+              ) : (
+                <TouchableOpacity
+                  style={StyleSheet.absoluteFill}
+                  onPress={() => {
+                    remindersInitializedRef.current = false;
+                    setActiveSheet(null);
+                    setEditingReminderId(null);
+                  }}
+                />
+              )}
 
-                const html = `
+              {activeSheet === "options" && (
+                <OptionsSheet
+                  style={styles.sheet}
+                  onClose={() => setActiveSheet(null)}
+                  onListReminders={() => {
+                    if (mode !== "edit" || !activeListKey) {
+                      Alert.alert(t("error"), t("saveListFirst"));
+                      return;
+                    }
+                    setActiveSheet("reminders");
+                  }}
+                  onSortAlphabetical={() => {
+                    setTasks((t) =>
+                      [...t].sort((a, b) => a.title.localeCompare(b.title))
+                    );
+                    setActiveSheet(null);
+                  }}
+                  onSortByDate={() => {
+                    setTasks((t) =>
+                      [...t].sort((a, b) => Number(a.id) - Number(b.id))
+                    );
+                    setActiveSheet(null);
+                  }}
+                  onCopy={async () => {
+                    // Build the share content: title plus task list
+                    const listTitle =
+                      mode === "edit" ? activeList?.label || "" : title;
+                    const taskLines = tasks
+                      .map(
+                        (task, i) =>
+                          `${i + 1}. ${task.done ? "✅" : "🔲"} ${task.title}`
+                      )
+                      .join("\n");
+                    const message = `${listTitle}\n\n${taskLines}`;
+                    try {
+                      if (Platform.OS === "android") {
+                        await Share.share({ message });
+                        setActiveSheet(null);
+                      } else {
+                        setActiveSheet("share");
+                      }
+                    } catch (e) {
+                      console.error("Share failed:", e);
+                    }
+                  }}
+                  onPrint={async () => {
+                    const listTitle =
+                      mode === "edit" ? activeList?.label || "" : title;
+                    const taskLines = tasks.map(
+                      (task, i) =>
+                        `<li>${i + 1}. ${task.done ? "✅" : "🔲"} ${
+                          task.title
+                        }</li>`
+                    );
+
+                    const html = `
                 <html>
                   <body>
                     <h1>${listTitle}</h1>
@@ -1604,62 +1767,287 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                 </html>
               `;
 
-                try {
-                  await Print.printAsync({ html });
-                } catch (error) {
-                  console.error("Print failed:", error);
-                }
-                cancelModalQueue();
-                setShowOptions(false);
-              }}
-            />
-          </View>
-        </Modal>
-        )}
-
-       {showShare && (
-        <Modal
-          visible={showShare}
-          animationType="slide"
-          transparent
-          presentationStyle="overFullScreen"
-          onRequestClose={() => setShowShare(false)}
-        >
-          <ShareModal
-            onClose={() => setShowShare(false)}
-            listTitle={mode === "edit" ? activeList?.label || "" : title}
-            tasks={tasks}
-          />
-        </Modal>
-         )}
-
-        {showShareModal && (
-        <Modal
-          visible={showShareModal}
-          transparent
-          animationType="slide"
-          presentationStyle="overFullScreen"
-          onRequestClose={() => setShowShareModal(false)}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
-            keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-          >
-            <View style={styles.modal}>
-              <TouchableWithoutFeedback onPress={() => setShowShareModal(false)}>
-                <View style={StyleSheet.absoluteFill} />
-              </TouchableWithoutFeedback>
-              <View style={styles.sheet}>
-                <ShareModal
-                  listTitle={mode === "edit" ? activeList?.label || "" : title}
-                  tasks={tasks}
-                  onClose={() => setShowShareModal(false)}
+                    try {
+                      await Print.printAsync({ html });
+                    } catch (error) {
+                      console.error("Print failed:", error);
+                    }
+                    setActiveSheet(null);
+                  }}
                 />
-              </View>
+              )}
+
+              {activeSheet === "share" && (
+                <View style={styles.sheet}>
+                  <ShareModal
+                    listTitle={mode === "edit" ? activeList?.label || "" : title}
+                    tasks={tasks}
+                    onClose={() => setActiveSheet(null)}
+                  />
+                </View>
+              )}
+
+              {activeSheet === "tagPicker" && (
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 24,
+                    left: 16,
+                    right: 16,
+                    backgroundColor: theme.cardBackground,
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "600",
+                      color: theme.text,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {t("tags")}
+                  </Text>
+                  <TouchableOpacity
+                    style={{ paddingVertical: 8 }}
+                    onPress={() => applyTag(null)}
+                  >
+                    <Text style={{ color: theme.text }}>{t("noTag")}</Text>
+                  </TouchableOpacity>
+                  {TAGS.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={{ paddingVertical: 8 }}
+                      onPress={() => applyTag(tag)}
+                    >
+                      <Text style={{ color: theme.text }}>{tag}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {activeSheet === "reminders" && (
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 24,
+                    left: 16,
+                    right: 16,
+                    backgroundColor: theme.cardBackground,
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "600",
+                      color: theme.text,
+                      marginBottom: 12,
+                    }}
+                  >
+                    {t("listReminders")}
+                  </Text>
+                  {remindersDraft.map((r) => (
+                    <View key={r.id} style={{ marginBottom: 12 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <TouchableOpacity
+                          onPress={() =>
+                            updateReminder(r.id, { enabled: !r.enabled })
+                          }
+                          style={{ marginRight: 12 }}
+                        >
+                          <Ionicons
+                            name={r.enabled ? "checkbox" : "square-outline"}
+                            size={20}
+                            color={theme.text}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const d = new Date();
+                            d.setHours(r.hour, r.minute, 0, 0);
+                            setReminderTimeTemp(d);
+                            setEditingReminderId(r.id);
+                            setActiveSheet("reminderTime");
+                          }}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            flex: 1,
+                          }}
+                        >
+                          <Ionicons
+                            name="time-outline"
+                            size={18}
+                            color="#2563EB"
+                          />
+                          <Text style={{ marginLeft: 6, color: theme.text }}>
+                            {r.label}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() =>
+                            setRemindersDraft((prev) =>
+                              prev.filter((x) => x.id !== r.id)
+                            )
+                          }
+                          style={{ marginLeft: 8 }}
+                        >
+                          <Ionicons
+                            name="trash-outline"
+                            size={18}
+                            color="#EF4444"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <View style={{ flexDirection: "row", marginTop: 8 }}>
+                        {dayLabels.map((label, idx) => {
+                          const day = idx; // 0..6
+                          const active = r.daysOfWeek.includes(day);
+                          return (
+                            <TouchableOpacity
+                              key={`${r.id}-${day}`}
+                              onPress={() => toggleReminderDay(r.id, day)}
+                              style={{
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 8,
+                                marginRight: 6,
+                                backgroundColor: active
+                                  ? "#2563EB"
+                                  : "transparent",
+                                borderWidth: 1,
+                                borderColor: active ? "#2563EB" : "#999",
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: active ? "#FFF" : theme.text,
+                                  fontSize: 12,
+                                }}
+                              >
+                                {label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                  <TouchableOpacity
+                    onPress={() =>
+                      setRemindersDraft((prev) => [
+                        ...prev,
+                        createDefaultReminder(),
+                      ])
+                    }
+                    style={{ paddingVertical: 8 }}
+                  >
+                    <Text style={{ color: "#2563EB" }}>
+                      {t("addReminder")}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      marginTop: 12,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => {
+                        remindersInitializedRef.current = false;
+                        setActiveSheet(null);
+                        setEditingReminderId(null);
+                      }}
+                      style={{ marginRight: 16 }}
+                    >
+                      <Text style={{ color: theme.secondaryText }}>
+                        {t("cancel")}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={async () => {
+                        if (mode === "edit" && activeListKey) {
+                          await scheduleListReminders(
+                            activeListKey,
+                            remindersDraft
+                          );
+                        }
+                        remindersInitializedRef.current = false;
+                        setActiveSheet(null);
+                        setEditingReminderId(null);
+                      }}
+                    >
+                      <Text style={{ color: "#2563EB", fontWeight: "600" }}>
+                        {t("save")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {activeSheet === "reminderTime" && reminderTimeTemp && (
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 24,
+                    left: 16,
+                    right: 16,
+                    backgroundColor: theme.cardBackground,
+                    borderRadius: 12,
+                    padding: 16,
+                  }}
+                >
+                  <DateTimePicker
+                    value={reminderTimeTemp}
+                    mode="time"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    onChange={(event, selectedTime) => {
+                      if (selectedTime) setReminderTimeTemp(selectedTime);
+                    }}
+                  />
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-end",
+                      marginTop: 12,
+                    }}
+                  >
+                    <TouchableOpacity
+                      onPress={() => setActiveSheet("reminders")}
+                      style={{ marginRight: 16 }}
+                    >
+                      <Text style={{ color: theme.secondaryText }}>
+                        {t("cancel")}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (editingReminderId && reminderTimeTemp) {
+                          const h = reminderTimeTemp.getHours();
+                          const m = reminderTimeTemp.getMinutes();
+                          updateReminder(editingReminderId, {
+                            hour: h,
+                            minute: m,
+                            label: makeReminderLabel(h, m),
+                          });
+                        }
+                        setActiveSheet("reminders");
+                      }}
+                    >
+                      <Text style={{ color: "#2563EB", fontWeight: "600" }}>
+                        {t("save")}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
-          </KeyboardAvoidingView>
-        </Modal>
+          </View>
         )}
       {/* Custom iOS DateTimePickerModal */}
       {Platform.OS === 'ios' && showDatePickerModal && (
@@ -1681,6 +2069,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1000,
+  },
   container: {
     flex: 1,
   },
