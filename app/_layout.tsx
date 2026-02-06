@@ -125,19 +125,19 @@ function InnerLayout() {
               const nextDate = allDates[1];
               const listLabel =
                 findListLabel?.(listKeyData || key) ?? "Unknown list";
-              const newId = await Notifications.scheduleNotificationAsync({
-                content: {
-                  title: t("taskReminderTitle"),
-                  body: t("taskReminderBody", {
-                    task: task.title,
-                    list: listLabel,
-                  }),
-                  sound: true,
-                  data: { listKey: key },
-                },
-                trigger: {
-                  type: Notifications.SchedulableTriggerInputTypes.DATE,
-                  date: nextDate,
+                const newId = await Notifications.scheduleNotificationAsync({
+                  content: {
+                    title: t("taskReminderTitle"),
+                    body: t("taskReminderBody", {
+                      task: task.title,
+                      list: listLabel,
+                    }),
+                    sound: true,
+                    data: { listKey: key, taskId: task.id },
+                  },
+                  trigger: {
+                    type: Notifications.SchedulableTriggerInputTypes.DATE,
+                    date: nextDate,
                 },
               });
 

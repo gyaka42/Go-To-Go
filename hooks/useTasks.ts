@@ -2,7 +2,7 @@ import * as Crypto from "expo-crypto";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import { Task, useAppStore } from "../store/appStore";
-import { RRule, Options as RRuleOptions, Weekday } from "rrule";
+import { Options as RRuleOptions, RRule, Weekday } from "rrule";
 
 export default function useTasks(
   tasks: Task[],
@@ -14,6 +14,7 @@ export default function useTasks(
     async (
       title: string,
       date: Date,
+      taskId: string,
       listKey?: string,
       recurrence?: Partial<RRuleOptions>
     ): Promise<string | undefined> => {
@@ -29,7 +30,6 @@ export default function useTasks(
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date,
         };
-
         if (recurrence) {
           const freq = recurrence.freq;
           const interval = recurrence.interval ?? 1;
@@ -82,7 +82,7 @@ export default function useTasks(
               list: listLabel,
             }),
             sound: "default",
-            data: { listKey },
+            data: { listKey, taskId },
           },
           trigger,
         });
@@ -104,18 +104,20 @@ export default function useTasks(
     ): Promise<Task | undefined> => {
       if (!title.trim()) return;
 
+      const taskId = Crypto.randomUUID();
       let notificationId: string | undefined;
       if (dueDate) {
         notificationId = await scheduleReminder(
           title.trim(),
           dueDate,
+          taskId,
           listKey,
           recurrence
         );
       }
 
       const task: Task = {
-        id: Crypto.randomUUID(),
+        id: taskId,
         title: title.trim(),
         done: false,
         dueDate: dueDate || null,

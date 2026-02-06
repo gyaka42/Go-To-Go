@@ -150,12 +150,13 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     setShowDatePickerModal(false);
 
     if (selectedTask) {
-      if (selectedTask.notificationId) {
-        await Notifications.cancelScheduledNotificationAsync(
-          selectedTask.notificationId
-        );
-      }
-      const trigger = buildTaskTrigger(date, selectedTask.recurrence);
+      await debugTaskNotifications(selectedTask.id, "before-cancel");
+      await cancelTaskNotifications(selectedTask.id);
+      const adjustedRecurrence = adjustRecurrenceForDate(
+        selectedTask.recurrence,
+        date
+      );
+      const trigger = buildTaskTrigger(date, adjustedRecurrence);
       const { findListLabel, t } = useAppStore.getState();
       const listLabel =
         findListLabel?.(selectedTask.listKey) ?? "Unknown list";
@@ -167,15 +168,22 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             list: listLabel,
           }),
           sound: true,
+          data: { listKey: selectedTask.listKey, taskId: selectedTask.id },
         },
         trigger,
       });
       const updatedTasks = tasks.map((t) =>
         t.id === selectedTask.id
-          ? { ...t, dueDate: date, notificationId: newNotificationId }
+          ? {
+              ...t,
+              dueDate: date,
+              notificationId: newNotificationId,
+              recurrence: adjustedRecurrence,
+            }
           : t
       );
       setTasks(updatedTasks);
+      await debugTaskNotifications(selectedTask.id, "after-schedule");
     } else {
       setNewTaskDueDate(date);
     }
@@ -919,64 +927,116 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     setListReminders(listKey, updated);
   };
 
+  const debugTaskNotifications = async (taskId: string, label: string) => {
+    if (!__DEV__) return;
+    try {
+      const all = await Notifications.getAllScheduledNotificationsAsync();
+      const matches = all.filter(
+        (n) => n.content?.data?.taskId === taskId
+      );
+      __DEV__ &&
+        console.log(
+          `[notif-debug:${label}] taskId=${taskId} count=${matches.length}`,
+          matches.map((m) => ({
+            id: m.identifier,
+            trigger: m.trigger,
+            data: m.content?.data,
+          }))
+        );
+    } catch (e) {
+      __DEV__ && console.warn("[notif-debug] failed", e);
+    }
+  };
+
+  const cancelTaskNotifications = async (taskId: string) => {
+    try {
+      const all = await Notifications.getAllScheduledNotificationsAsync();
+      const matches = all.filter(
+        (n) => n.content?.data?.taskId === taskId
+      );
+      await Promise.all(
+        matches.map((m) =>
+          Notifications.cancelScheduledNotificationAsync(m.identifier)
+        )
+      );
+    } catch {}
+  };
+
   const buildTaskTrigger = (
     date: Date,
     recurrence?: Partial<RRuleOptions>
   ): Notifications.NotificationTriggerInput => {
-    if (!recurrence) {
-      return {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date,
-      };
-    }
-    const freq = recurrence.freq;
-    const interval = recurrence.interval ?? 1;
-    if (freq === Frequency.DAILY && interval === 1) {
-      return {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        hour: date.getHours(),
-        minute: date.getMinutes(),
-        repeats: true,
-      };
-    }
-    if (
-      freq === Frequency.WEEKLY &&
-      interval === 1 &&
-      Array.isArray(recurrence.byweekday) &&
-      recurrence.byweekday.length === 1
-    ) {
-      const rruleDay = recurrence.byweekday[0];
-      let weekdayIdx: number;
-      if (typeof rruleDay === "number") {
-        weekdayIdx = rruleDay;
-      } else if (typeof rruleDay === "string") {
-        const wk = (RRule as any)[rruleDay.toUpperCase()] as Weekday;
-        weekdayIdx = wk.weekday;
-      } else {
-        weekdayIdx = (rruleDay as Weekday).weekday;
+    if (recurrence) {
+      const freq = recurrence.freq;
+      const interval = recurrence.interval ?? 1;
+      if (freq === Frequency.DAILY && interval === 1) {
+        return {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          hour: date.getHours(),
+          minute: date.getMinutes(),
+          repeats: true,
+        };
       }
-      const weekday = ((weekdayIdx + 1) % 7) + 1; // rrule 0=Mon
-      return {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        weekday,
-        hour: date.getHours(),
-        minute: date.getMinutes(),
-        repeats: true,
-      };
-    }
-    if (freq === Frequency.MONTHLY && interval === 1) {
-      return {
-        type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
-        day: date.getDate(),
-        hour: date.getHours(),
-        minute: date.getMinutes(),
-        repeats: true,
-      };
+      if (
+        freq === Frequency.WEEKLY &&
+        interval === 1 &&
+        Array.isArray(recurrence.byweekday) &&
+        recurrence.byweekday.length === 1
+      ) {
+        const rruleDay = recurrence.byweekday[0];
+        let weekdayIdx: number;
+        if (typeof rruleDay === "number") {
+          weekdayIdx = rruleDay;
+        } else if (typeof rruleDay === "string") {
+          const wk = (RRule as any)[rruleDay.toUpperCase()] as Weekday;
+          weekdayIdx = wk.weekday;
+        } else {
+          weekdayIdx = (rruleDay as Weekday).weekday;
+        }
+        const weekday = ((weekdayIdx + 1) % 7) + 1; // rrule 0=Mon
+        return {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          weekday,
+          hour: date.getHours(),
+          minute: date.getMinutes(),
+          repeats: true,
+        };
+      }
+      if (freq === Frequency.MONTHLY && interval === 1) {
+        return {
+          type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
+          day: date.getDate(),
+          hour: date.getHours(),
+          minute: date.getMinutes(),
+          repeats: true,
+        };
+      }
     }
     return {
       type: Notifications.SchedulableTriggerInputTypes.DATE,
       date,
     };
+  };
+
+  const adjustRecurrenceForDate = (
+    recurrence: Partial<RRuleOptions> | undefined,
+    date: Date
+  ): Partial<RRuleOptions> | undefined => {
+    if (!recurrence) return recurrence;
+    if (recurrence.freq !== Frequency.WEEKLY) return recurrence;
+
+    const byweekday = Array.isArray(recurrence.byweekday)
+      ? recurrence.byweekday
+      : [];
+
+    // If weekly with no/maybe single day, align to the new date's weekday
+    if (byweekday.length <= 1) {
+      const jsDay = date.getDay(); // 0=Sun..6=Sat
+      const rruleDay = (jsDay + 6) % 7; // 0=Mon..6=Sun
+      return { ...recurrence, byweekday: [rruleDay] };
+    }
+
+    return recurrence;
   };
 
   const saveRename = () => {
@@ -1095,18 +1155,19 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     newDate.setMilliseconds(0);
 
     // Verwijder oude notificatie indien aanwezig
-    if (selectedTask.notificationId) {
-      await Notifications.cancelScheduledNotificationAsync(
-        selectedTask.notificationId
-      );
-    }
+    await debugTaskNotifications(selectedTask.id, "before-cancel");
+    await cancelTaskNotifications(selectedTask.id);
 
     // Plan nieuwe notificatie
     const { findListLabel, t } = useAppStore.getState();
     const listLabel =
       findListLabel?.(selectedTask.listKey) ?? "Unknown list";
 
-    const trigger = buildTaskTrigger(newDate, selectedTask.recurrence);
+    const adjustedRecurrence = adjustRecurrenceForDate(
+      selectedTask.recurrence,
+      newDate
+    );
+    const trigger = buildTaskTrigger(newDate, adjustedRecurrence);
     const newNotificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: t("taskReminderTitle"),
@@ -1115,6 +1176,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           list: listLabel,
         }),
         sound: true,
+        data: { listKey: selectedTask.listKey, taskId: selectedTask.id },
       },
       trigger,
     });
@@ -1123,12 +1185,14 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       ...selectedTask,
       dueDate: newDate,
       notificationId: newNotificationId,
+      recurrence: adjustedRecurrence,
     };
 
     setTasks((prevTasks) =>
       prevTasks.map((t) => (t.id === selectedTask.id ? updatedTask : t))
     );
     setSelectedTask(updatedTask);
+    await debugTaskNotifications(selectedTask.id, "after-schedule");
     setDatePickerFor(null);
     if (Platform.OS === "android") setShowDatePicker(false);
   };
@@ -1582,19 +1646,23 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                   };
 
                   // --- BEGIN Notification handling for iOS date picker ---
-                  if (selectedTask.notificationId) {
-                    await Notifications.cancelScheduledNotificationAsync(
-                      selectedTask.notificationId
-                    );
-                  }
+                  await debugTaskNotifications(
+                    selectedTask.id,
+                    "before-cancel"
+                  );
+                  await cancelTaskNotifications(selectedTask.id);
 
                   const { findListLabel, t } = useAppStore.getState();
                   const listLabel =
                     findListLabel?.(selectedTask.listKey) ?? "Unknown list";
 
+                  const adjustedRecurrence = adjustRecurrenceForDate(
+                    selectedTask.recurrence,
+                    finalDate
+                  );
                   const trigger = buildTaskTrigger(
                     finalDate,
-                    selectedTask.recurrence
+                    adjustedRecurrence
                   );
                   const newNotificationId =
                     await Notifications.scheduleNotificationAsync({
@@ -1605,6 +1673,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                           list: listLabel,
                         }),
                         sound: true,
+                        data: {
+                          listKey: selectedTask.listKey,
+                          taskId: selectedTask.id,
+                        },
                       },
                       trigger,
                     });
@@ -1612,6 +1684,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                   const updatedTaskWithNotif = {
                     ...updatedTask,
                     notificationId: newNotificationId,
+                    recurrence: adjustedRecurrence,
                   };
 
                   setTasks((prevTasks) =>
@@ -1620,6 +1693,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                     )
                   );
                   setSelectedTask(updatedTaskWithNotif);
+                  await debugTaskNotifications(
+                    selectedTask.id,
+                    "after-schedule"
+                  );
                   // --- END Notification handling for iOS date picker ---
                 }
 
