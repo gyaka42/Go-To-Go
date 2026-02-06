@@ -10,7 +10,6 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useNavigation } from "@react-navigation/native";
 import { TouchableOpacity as RNTouchableOpacity } from "react-native";
@@ -70,11 +69,7 @@ export default function SearchScreen() {
       const allLists = [...baseMenu, ...lists];
       const matchesMap = new Map<string, SearchResult>();
       for (const lst of allLists) {
-        let tasks = tasksMap[lst.key];
-        if (tasks === undefined) {
-          const json = await AsyncStorage.getItem(`todos_${lst.key}`);
-          tasks = json ? JSON.parse(json) : [];
-        }
+        const tasks = tasksMap[lst.key] ?? [];
         tasks.forEach((t) => {
           if (t.title.toLowerCase().includes(q)) {
             const matchKey = `${t.id}@${lst.key}`;
@@ -90,7 +85,7 @@ export default function SearchScreen() {
           }
         });
       }
-      console.log(
+      __DEV__ && console.log(
         "Search matches:",
         Array.from(matchesMap.values()).map((m) => `${m.id}@${m.listKey}`)
       );

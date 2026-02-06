@@ -61,7 +61,7 @@ function InnerLayout() {
 
       // Handle taps on scheduled notifications with robust logging
       Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log(
+        __DEV__ && console.log(
           "🔔 Notificatie response ontvangen:",
           JSON.stringify(response, null, 2)
         );
@@ -69,9 +69,9 @@ function InnerLayout() {
         const { notification } = response;
         const { title, body, data } = notification.request.content;
 
-        console.log("🔔 Titel:", title);
-        console.log("🔔 Body:", body);
-        console.log("🔔 Data:", data);
+        __DEV__ && console.log("🔔 Titel:", title);
+        __DEV__ && console.log("🔔 Body:", body);
+        __DEV__ && console.log("🔔 Data:", data);
 
         const { listKey } = data;
         if (listKey) {

@@ -179,7 +179,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const editScrollPositionRef = useRef<number>(0);
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", (e) => {
-      console.log(
+      __DEV__ && console.log(
         "[keyboardDidShow] keyboardHeight set to",
         e.endCoordinates.height
       );
@@ -189,7 +189,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
       () => {
         setKeyboardHeight(0);
-        console.log(
+        __DEV__ && console.log(
           "[keyboardWillHide] restoring scroll to",
           editScrollPositionRef.current
         );
@@ -349,7 +349,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   useEffect(() => {
     if (!notif || tasks.length === 0 || hasHighlightedRef.current) return;
     // Debug: log alle notificationId's
-    console.log(
+    __DEV__ && console.log(
       "[notif-handler] alle task.notificationId’s:",
       tasks.map((t) => t.notificationId)
     );
@@ -357,7 +357,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     setTimeout(() => {
       const index = tasks.findIndex((t) => t.notificationId === notif);
       // Debug: log gevonden index
-      console.log(
+      __DEV__ && console.log(
         "[notif-handler] gevonden index:",
         index,
         "van",
@@ -393,11 +393,16 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   // Sync back
   useEffect(() => {
     if (mode === "edit" && activeListKey) {
-      setTasksMap({ ...tasksMap, [activeListKey]: tasks });
+      setTasksMap({
+        ...useAppStore.getState().tasksMap,
+        [activeListKey]: tasks,
+      });
       setLists(
-        lists.map((l) =>
-          l.key === activeListKey ? { ...l, count: tasks.length } : l
-        )
+        useAppStore
+          .getState()
+          .lists.map((l) =>
+            l.key === activeListKey ? { ...l, count: tasks.length } : l
+          )
       );
     }
   }, [tasks]);
@@ -406,13 +411,13 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const pendingNotificationRef: React.MutableRefObject<Notifications.NotificationResponse | null> =
     useRef<Notifications.NotificationResponse | null>(null);
   useEffect(() => {
-    console.log(
+    __DEV__ && console.log(
       "🔁 useEffect voor notificaties her-rendered met taken:",
       tasks.length
     );
     if (!activeListKey) return;
 
-    console.log(
+    __DEV__ && console.log(
       "🔄 useEffect triggered voor notification response listener met activeListKey:",
       activeListKey
     );
@@ -420,22 +425,22 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     const listener = async (
       notification: Notifications.NotificationResponse
     ) => {
-      console.log(
+      __DEV__ && console.log(
         "🔔 Notificatie response ontvangen:",
         JSON.stringify(notification, null, 2)
       );
       // --- BEGIN Debugging output for notificationId existence in tasks ---
       const tappedNotifId = notification.notification.request.identifier;
       // 🆕 Sla notificationId op in state
-      console.log("🔔 Notificatie-ID ontvangen:", tappedNotifId);
+      __DEV__ && console.log("🔔 Notificatie-ID ontvangen:", tappedNotifId);
       setPendingNotificationId(tappedNotifId);
       // --- END Nieuw toegevoegd ---
       const taskExists = tasks.some((t) => t.notificationId === tappedNotifId);
-      console.log("🔎 Bestaat de taak met dit notificationId?", taskExists);
+      __DEV__ && console.log("🔎 Bestaat de taak met dit notificationId?", taskExists);
       if (!taskExists) {
-        console.log("❌ Geen bijpassende taak gevonden voor deze notificatie.");
+        __DEV__ && console.log("❌ Geen bijpassende taak gevonden voor deze notificatie.");
       } else {
-        console.log("✅ Taak gevonden voor deze notificatie.");
+        __DEV__ && console.log("✅ Taak gevonden voor deze notificatie.");
       }
       // --- END Debugging output ---
 
@@ -443,22 +448,22 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       if (notification?.notification?.request?.identifier) {
         pendingNotificationRef.current = notification;
       } else {
-        console.log(
+        __DEV__ && console.log(
           "⚠️ Notificatie zonder geldige identifier ontvangen:",
           notification
         );
       }
       // --- [ScrollTest] Add logging after setting pendingNotificationRef.current ---
-      console.log(
+      __DEV__ && console.log(
         "📦 [ScrollTest] Geregistreerde notificatie-ID:",
         tappedNotifId
       );
-      console.log(
+      __DEV__ && console.log(
         "📦 [ScrollTest] Takenlijst op dat moment:",
         tasks.map((t) => ({ id: t.id, notifId: t.notificationId }))
       );
       // --- [End ScrollTest] ---
-      console.log("📦 pendingNotificationRef gezet op:", tappedNotifId);
+      __DEV__ && console.log("📦 pendingNotificationRef gezet op:", tappedNotifId);
 
       // Extract and guard the notification's listKey value
       const listKeyParam =
@@ -469,7 +474,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       }
 
       if (tasks.length === 0 || !taskExists) {
-        console.log(
+        __DEV__ && console.log(
           "⚠️ Tasks nog niet geladen of taak onbekend. Sla response tijdelijk op."
         );
         setPendingTrigger((prev) => prev + 1);
@@ -481,11 +486,11 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 
     const subscription =
       Notifications.addNotificationResponseReceivedListener(listener);
-    console.log("📣 Notification response listener geregistreerd (eenmalig).");
+    __DEV__ && console.log("📣 Notification response listener geregistreerd (eenmalig).");
 
     return () => {
       subscription.remove();
-      console.log("📴 Notification response listener verwijderd.");
+      __DEV__ && console.log("📴 Notification response listener verwijderd.");
     };
   }, [activeListKey, tasks]);
 
@@ -495,7 +500,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       const initialResponse =
         await Notifications.getLastNotificationResponseAsync();
       if (initialResponse) {
-        console.log(
+        __DEV__ && console.log(
           "📲 Fallback: laatste notificatie opgehaald bij start:",
           initialResponse.notification.request.identifier
         );
@@ -511,15 +516,15 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 
   useEffect(() => {
     const pending = pendingNotificationRef.current;
-    console.log("🔁 [pendingTrigger useEffect] Triggered");
-    console.log("📦 Aantal taken:", tasks.length);
+    __DEV__ && console.log("🔁 [pendingTrigger useEffect] Triggered");
+    __DEV__ && console.log("📦 Aantal taken:", tasks.length);
     const taskIds = tasks.map((t) => t.notificationId);
-    console.log("📦 taskIds:", taskIds);
-    console.log("📦 pendingNotificationRef:", pending);
+    __DEV__ && console.log("📦 taskIds:", taskIds);
+    __DEV__ && console.log("📦 pendingNotificationRef:", pending);
 
     // 🆕 Nieuw: check pendingNotificationId
     if (pendingNotificationId && taskIds.includes(pendingNotificationId)) {
-      console.log("📍 Scroll naar taak-ID:", pendingNotificationId);
+      __DEV__ && console.log("📍 Scroll naar taak-ID:", pendingNotificationId);
       scrollToTask(pendingNotificationId);
       highlightTask(pendingNotificationId);
       setPendingNotificationId(null);
@@ -535,18 +540,18 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       const pushNotifId = pending.notification.request.identifier;
       const taskExists = tasks.some((t) => t.notificationId === pushNotifId);
       if (taskExists) {
-        console.log("✅ Verwerk opgeslagen notificatie:", pushNotifId);
+        __DEV__ && console.log("✅ Verwerk opgeslagen notificatie:", pushNotifId);
         pendingNotificationRef.current = null;
         handleNotificationResponse(pending);
       } else {
-        console.log("⚠️ Notificatie gevonden, maar geen match in tasks.");
+        __DEV__ && console.log("⚠️ Notificatie gevonden, maar geen match in tasks.");
       }
     }
   }, [tasks, pendingTrigger, pendingNotificationId]);
 
   // 🆕 Functies scrollToTask en highlightTask (placeholder als niet aanwezig)
   const scrollToTask = (taskId: string) => {
-    console.log("🧭 Scroll functie aangeroepen voor:", taskId);
+    __DEV__ && console.log("🧭 Scroll functie aangeroepen voor:", taskId);
     // Implementeer de daadwerkelijke scroll logica hier
     // Je kunt flatListRef.current.scrollToIndex({ ... }) gebruiken
     const index = tasks.findIndex((t) => t.notificationId === taskId);
@@ -560,7 +565,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   };
 
   const highlightTask = (taskId: string) => {
-    console.log("🌟 Highlight functie aangeroepen voor:", taskId);
+    __DEV__ && console.log("🌟 Highlight functie aangeroepen voor:", taskId);
     setHighlightedTaskId(taskId);
     setTimeout(() => {
       setHighlightedTaskId(null);
@@ -581,66 +586,66 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     // Prevent duplicate handling of the same notification
     const taskId = response.notification.request.identifier;
     if (handledNotificationIds.current.has(taskId)) {
-      console.log("⏩ Notificatie al verwerkt:", taskId);
+      __DEV__ && console.log("⏩ Notificatie al verwerkt:", taskId);
       return;
     }
     handledNotificationIds.current.add(taskId);
     // 👇 De hele bestaande logica uit je originele listener komt hierheen.
-    console.log(
+    __DEV__ && console.log(
       "📥 Listener actief! Response ontvangen:",
       JSON.stringify(response, null, 2)
     );
-    console.log("🔧 DEBUG: Notification listener is actief.");
-    console.log(
+    __DEV__ && console.log("🔧 DEBUG: Notification listener is actief.");
+    __DEV__ && console.log(
       "📲 App geopend via notificatie. Navigatie stack:",
       navigation.getState()
     );
-    console.log("🔎 navigation object:", JSON.stringify(navigation, null, 2));
-    console.log("🧠 Aantal taken op moment van notificatie:", tasks.length);
+    __DEV__ && console.log("🔎 navigation object:", JSON.stringify(navigation, null, 2));
+    __DEV__ && console.log("🧠 Aantal taken op moment van notificatie:", tasks.length);
     if (tasks.length === 0) {
-      console.log(
+      __DEV__ && console.log(
         "⚠️ Takenlijst is leeg tijdens notificatie response. Mogelijk nog niet geladen."
       );
     }
 
-    console.log(
+    __DEV__ && console.log(
       "🪪 Notificatie response ontvangen voor taskId:",
       response.notification.request.identifier
     );
-    console.log("🔍 Alle taak IDs met notificationId:");
+    __DEV__ && console.log("🔍 Alle taak IDs met notificationId:");
     tasks.forEach((task, index) => {
-      console.log(
+      __DEV__ && console.log(
         `🔢 ${index + 1}. Taak "${task.title}" met ID: ${
           task.id
         } en notificationId: ${task.notificationId}`
       );
     });
-    console.log("🆔 Notificatie-ID ontvangen:", taskId);
-    console.log(
+    __DEV__ && console.log("🆔 Notificatie-ID ontvangen:", taskId);
+    __DEV__ && console.log(
       "🧾 Bekende notificationId's in takenlijst:",
       tasks.map((t) => t.notificationId)
     );
-    console.log("🔍 Alle taak IDs met notificationId:");
+    __DEV__ && console.log("🔍 Alle taak IDs met notificationId:");
     tasks.forEach((task, index) => {
-      console.log(
+      __DEV__ && console.log(
         `🔢 ${index + 1}. Taak "${task.title}" met ID: ${
           task.id
         } en notificationId: ${task.notificationId}`
       );
     });
-    console.log("🆔 Notificatie-ID ontvangen:", taskId);
-    console.log(
+    __DEV__ && console.log("🆔 Notificatie-ID ontvangen:", taskId);
+    __DEV__ && console.log(
       "🧾 Bekende notificationId's in takenlijst:",
       tasks.map((t) => t.notificationId)
     );
     // Log all notificationIds just before searching for the task
-    console.log(
+    __DEV__ && console.log(
       "📋 Alle taken met notificationId:",
       tasks.map((t) => t.notificationId)
     );
-    console.log("📦 Volledige task state:", JSON.stringify(tasks, null, 2));
+    __DEV__ && console.log("📦 Volledige task state:", JSON.stringify(tasks, null, 2));
     const allNotifIds = tasks.map((t) => t.notificationId);
-    console.log(
+    __DEV__ && console.log(
       "🧾 Vergelijken met bekende IDs:",
       JSON.stringify(allNotifIds, null, 2)
     );
@@ -648,7 +653,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
     const listKeyFromNotification =
       response.notification.request.content.data?.listKey;
     if (listKeyFromNotification && listKeyFromNotification !== activeListKey) {
-      console.log(
+      __DEV__ && console.log(
         "🧭 Navigatie fallback: push naar lijst",
         listKeyFromNotification
       );
@@ -657,135 +662,77 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       );
       return;
     }
-    console.log("🔍 Op zoek naar taak met notificationId:", taskId);
-    console.log(
+    __DEV__ && console.log("🔍 Op zoek naar taak met notificationId:", taskId);
+    __DEV__ && console.log(
       "📋 Alle notificationId's in taken:",
       tasks.map((t) => t.notificationId)
     );
     const task = tasks.find((t) => t.notificationId === taskId);
-    console.log("✅ task gevonden?", !!task);
+    __DEV__ && console.log("✅ task gevonden?", !!task);
     // --- [ScrollTest] Add logging before visibleTasks findIndex ---
     if (task) {
-      console.log(
+      __DEV__ && console.log(
         "📦 [ScrollTest] Geselecteerde taak in handleNotificationResponse:",
         task
       );
-      console.log("📦 [ScrollTest] Filtermode:", filterMode);
-      console.log(
+      __DEV__ && console.log("📦 [ScrollTest] Filtermode:", filterMode);
+      __DEV__ && console.log(
         "📦 [ScrollTest] Aantal zichtbare taken:",
         visibleTasks.length
       );
-      console.log(
+      __DEV__ && console.log(
         "📦 [ScrollTest] Zichtbare taken:",
         visibleTasks.map((t) => ({ id: t.id, title: t.title }))
       );
       
       const index = visibleTasks.findIndex((t) => t.id === task.id);
-      console.log("📍 Index van taak om naartoe te scrollen:", index);
+      __DEV__ && console.log("📍 Index van taak om naartoe te scrollen:", index);
       if (index !== -1 && flatListRef.current) {
-        console.log("📦 flatListRef.current:", flatListRef.current);
-        console.log(
+        __DEV__ && console.log("📦 flatListRef.current:", flatListRef.current);
+        __DEV__ && console.log(
           "📏 Scroll naar index:",
           index,
           "van",
           visibleTasks.length,
           "taken."
         );
-        console.log("🔧 Scroll direct naar index zonder delay:", index);
+        __DEV__ && console.log("🔧 Scroll direct naar index zonder delay:", index);
         flatListRef.current.scrollToIndex({
           index,
           animated: true,
           viewPosition: 0.5,
         });
         setHighlightedTaskId(task.id);
-        console.log("✅ Scroll & highlight gestart voor taak:", task.id);
+        __DEV__ && console.log("✅ Scroll & highlight gestart voor taak:", task.id);
         setTimeout(() => {
           setHighlightedTaskId(null);
-          console.log("🎨 Highlight weer verwijderd voor taak:", task.id);
+          __DEV__ && console.log("🎨 Highlight weer verwijderd voor taak:", task.id);
         }, 3000);
       }
     }
 
     if (!task) {
-      console.log(
+      __DEV__ && console.log(
         "🧪 DEBUG: Takenlijst bevat op dit moment:",
         tasks.map((t) => ({ id: t.id, notifId: t.notificationId }))
       );
     }
 
-    console.log(
+    __DEV__ && console.log(
       "🧪 Huidige notificationIds in tasks:",
       tasks.map((t) => t.notificationId)
     );
 
     if (!task) {
-      console.log(
+      __DEV__ && console.log(
         "⛔️ Geen taak gevonden die overeenkomt met de notificatie-ID:",
         taskId
       );
       return;
     }
 
-    if (!task.recurrence || !task.dueDate) {
-      console.log("⛔️ Taak heeft geen recurrence of dueDate, stoppen.");
-      return;
-    }
-
-    console.log("✅ Herhalende taak gevonden:", task.title);
-    console.log(
-      "🔁 Recurrence object:",
-      JSON.stringify(task.recurrence, null, 2)
-    );
-
-    const { RRule } = await import("rrule");
-    const rule = new RRule({
-      dtstart: task.dueDate,
-      ...task.recurrence,
-      count: 2,
-    });
-
-    const allDates = rule.all();
-    if (allDates.length < 2) {
-      console.log(
-        "⛔️ Minder dan 2 datums gevonden, geen nieuwe notificatie ingepland."
-      );
-      return;
-    }
-
-    const nextDate = allDates[1];
-    console.log(
-      "⏰ Nieuwe herhalingsnotificatie gepland op:",
-      nextDate.toISOString()
-    );
-
-    const { findListLabel, t } = useAppStore.getState();
-    const listLabel =
-      findListLabel?.(activeListKey || "") ?? "Unknown list";
-
-    const newNotificationId = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: t("taskReminderTitle"),
-        body: t("taskReminderBody", { task: task.title, list: listLabel }),
-        sound: true,
-        data: {
-          listKey: activeListKey,
-        },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DATE,
-        date: nextDate,
-      },
-    });
-
-    console.log("✅ Nieuwe notificatie gepland met ID:", newNotificationId);
-
-    const updatedTask = {
-      ...task,
-      dueDate: nextDate,
-      notificationId: newNotificationId,
-    };
-
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+    // Recurrence scheduling is handled globally in app/_layout.tsx
+    return;
   };
 
   // Persist new list and its tasks when leaving in create mode
@@ -796,11 +743,11 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         const key = newListKeyRef.current;
         // Add the new list item
         setLists([
-          ...lists,
+          ...useAppStore.getState().lists,
           { key, icon: "format-list-bulleted", label, count: tasks.length },
         ]);
         // Store its tasks
-        setTasksMap({ ...tasksMap, [key]: tasks });
+        setTasksMap({ ...useAppStore.getState().tasksMap, [key]: tasks });
         // Wait for Zustand to have the list available
         await waitForListKey(key);
       });
@@ -865,7 +812,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           viewPosition: 0.5,
         });
         setHighlightedTaskId(createdTask.id);
-        console.log(
+        __DEV__ && console.log(
           "🆕 Nieuw toegevoegde taak scrollen en highlighten:",
           createdTask.id
         );
@@ -959,7 +906,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         count: 0,
         createdAt: Date.now(),
       };
-      setLists([...lists, newList]);
+      setLists([...useAppStore.getState().lists, newList]);
       setActiveListKey(newList.key);
       newListKeyRef.current = id;
       listSavedRef.current = true;
@@ -1068,7 +1015,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       pendingNotificationRef.current.notification?.request?.identifier;
     const index = taskIds.findIndex((id) => id === pendingNotifId);
     if (index !== -1 && flatListRef.current?.scrollToIndex) {
-      console.log("📍 Scrollen naar index:", index);
+      __DEV__ && console.log("📍 Scrollen naar index:", index);
       flatListRef.current.scrollToIndex({ index, animated: true });
       setHighlightedTaskId(pendingNotifId);
       // Na scrollen: clear de ref zodat deze niet opnieuw triggert
@@ -1110,7 +1057,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       (highlightedTaskId === item.id ||
         highlightedTaskId === item.notificationId);
     if (isHighlighted) {
-      console.log("🎨 Highlight actief voor taak ID:", item.id);
+      __DEV__ && console.log("🎨 Highlight actief voor taak ID:", item.id);
     }
     const dueDateLabel = item.dueDate
       ? new Date(item.dueDate).toLocaleDateString(lang || "en-US", {
@@ -1225,7 +1172,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                   }, 100);
                 }}
                 onFocus={() => {
-                  console.log(
+                  __DEV__ && console.log(
                     "[TextInput onFocus] current scrollOffsetRef:",
                     scrollOffsetRef.current,
                     "keyboardHeight:",
@@ -1551,7 +1498,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             onScroll={({ nativeEvent }) => {
               const y = nativeEvent.contentOffset.y;
               scrollOffsetRef.current = y;
-              console.log("[onScroll] huidige offset:", y);
+              __DEV__ && console.log("[onScroll] huidige offset:", y);
             }}
             contentContainerStyle={{
               paddingBottom: keyboardHeight > 0 ? keyboardHeight + 50 : 0,
@@ -1564,8 +1511,8 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             initialNumToRender={20}
             onScrollToIndexFailed={(info) => {
               // Debug logs before fallback
-              console.warn("❗️Scroll to index failed. Info:", info);
-              console.warn("📦 Fallback scroll naar offset 0.");
+              __DEV__ && console.warn("❗️Scroll to index failed. Info:", info);
+              __DEV__ && console.warn("📦 Fallback scroll naar offset 0.");
               flatListRef.current?.scrollToOffset({
                 offset: 0,
                 animated: true,
@@ -1877,4 +1824,3 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 });
-

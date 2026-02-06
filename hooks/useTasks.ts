@@ -124,8 +124,8 @@ export default function useTasks(
         listKey: listKey ?? "", // fallback to empty string if undefined
         ...(dueDate || recurrence ? { highlight: true } : {}),
       };
-      console.log("🆔 Nieuwe taak-ID:", task.id);
-      console.log("🔔 Gekoppelde notificatie-ID:", notificationId);
+      __DEV__ && console.log("🆔 Nieuwe taak-ID:", task.id);
+      __DEV__ && console.log("🔔 Gekoppelde notificatie-ID:", notificationId);
       setTasks((prev) => [...prev, task]);
       return task;
     },
@@ -189,16 +189,16 @@ export default function useTasks(
 
       // Wacht een korte periode om te zorgen dat FlatList is gerenderd
       requestAnimationFrame(() => {
-        console.log("🎯 Scroll & highlight taak-ID na notificatie:", taskId);
+        __DEV__ && console.log("🎯 Scroll & highlight taak-ID na notificatie:", taskId);
         if (typeof onHighlightTask === "function") {
           try {
             onHighlightTask(taskId);
-            console.log("✅ onHighlightTask aangeroepen met:", taskId);
+            __DEV__ && console.log("✅ onHighlightTask aangeroepen met:", taskId);
           } catch (e) {
             console.error("❌ Fout bij onHighlightTask:", e);
           }
         } else {
-          console.warn(
+          __DEV__ && console.warn(
             "⚠️ onHighlightTask is geen functie:",
             typeof onHighlightTask
           );
@@ -215,7 +215,7 @@ export default function useTasks(
     highlightedTaskIds,
     pendingNotificationRef,
     setPendingNotificationId: (id: string) => {
-      console.log("🔧 setPendingNotificationId aangeroepen met ID:", id);
+      __DEV__ && console.log("🔧 setPendingNotificationId aangeroepen met ID:", id);
       if (id) {
         pendingNotificationRef.current = id;
         setRefreshTrigger((r) => r + 1); // dwing herberekening af

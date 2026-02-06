@@ -141,6 +141,22 @@ export default function HomeScreen() {
     });
   }, []);
 
+  // Clean list_order if it contains keys that no longer exist
+  useEffect(() => {
+    const validKeys = new Set([
+      ...baseMenu.map((m) => m.key),
+      ...lists.map((l) => l.key),
+    ]);
+    setOrder((prev) => {
+      const next = prev.filter((k) => validKeys.has(k));
+      const unchanged =
+        next.length === prev.length && next.every((k, i) => k === prev[i]);
+      if (unchanged) return prev;
+      AsyncStorage.setItem("list_order", JSON.stringify(next));
+      return next;
+    });
+  }, [lists, baseMenu]);
+
   // 2️⃣ Effect: eerst controleren of er een “user_name” in AsyncStorage staat
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -184,14 +200,13 @@ export default function HomeScreen() {
         ...baseMenu.map((m) => m.key),
         ...lists.map((l) => l.key),
       ];
-      Promise.all(
-        allKeys.map(async (k) => {
-          const json = await AsyncStorage.getItem(`todos_${k}`);
-          const arr = json ? JSON.parse(json) : [];
-          return [k, arr.length] as [string, number];
-        })
-      ).then((entries) => setCounts(Object.fromEntries(entries)));
-    }, [lists])
+      const nextCounts: Record<string, number> = {};
+      allKeys.forEach((k) => {
+        const arr = tasksMap[k] ?? [];
+        nextCounts[k] = arr.length;
+      });
+      setCounts(nextCounts);
+    }, [lists, tasksMap])
   );
 
   // 6️⃣ Hook voor verwijderen van een custom lijstje
@@ -206,6 +221,13 @@ export default function HomeScreen() {
 
     // Remove the list and its tasks via the store's removeList method
     useAppStore.getState().removeList(key);
+
+    // Clean up list order so deleted lists don't linger
+    setOrder((prev) => {
+      const next = prev.filter((k) => k !== key);
+      AsyncStorage.setItem("list_order", JSON.stringify(next));
+      return next;
+    });
   };
 
   // ──────────────────────────────────────────────────────

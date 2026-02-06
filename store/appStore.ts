@@ -67,9 +67,14 @@ export const useAppStore = create<AppState>()(
       activeListKey: null,
       setActiveListKey: (key) => set({ activeListKey: key }),
       setLists: (newLists) => {
-        const current = get().lists;
-        const combined = [...current, ...newLists];
-        const unique = [...new Map(combined.map((l) => [l.key, l])).values()];
+        const safeLists = Array.isArray(newLists) ? newLists : [];
+        const unique = [
+          ...new Map(
+            safeLists
+              .filter((l) => l && typeof l.key === "string")
+              .map((l) => [l.key, l])
+          ).values(),
+        ];
         set({ lists: unique });
       },
       setTasksMap: (map) => {
@@ -84,7 +89,7 @@ export const useAppStore = create<AppState>()(
         }
 
         set({ tasksMap: cleanedMap });
-        console.log("🧼 highlight reset uitgevoerd bij setTasksMap");
+        __DEV__ && console.log("🧼 highlight reset uitgevoerd bij setTasksMap");
       },
       setMode: (mode) => {
         set({
@@ -165,7 +170,12 @@ export const useAppStore = create<AppState>()(
         const updatedLists = currentLists.filter((l) => l.key !== key);
         const currentTasksMap = get().tasksMap;
         const { [key]: removedTasks, ...restTasksMap } = currentTasksMap;
-        set({ lists: updatedLists, tasksMap: restTasksMap });
+        const activeListKey = get().activeListKey;
+        set({
+          lists: updatedLists,
+          tasksMap: restTasksMap,
+          activeListKey: activeListKey === key ? null : activeListKey,
+        });
       },
     }),
     {
