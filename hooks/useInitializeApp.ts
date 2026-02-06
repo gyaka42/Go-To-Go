@@ -83,9 +83,8 @@ export default function useInitializeApp() {
   const listsInStore = useAppStore((s) => s.lists);
 
   useEffect(() => {
-    if (listsInStore.length > 0) {
-      AsyncStorage.setItem("user_lists", JSON.stringify(listsInStore));
-    }
+    // Always persist, even when empty, so deleted custom lists don't come back.
+    AsyncStorage.setItem("user_lists", JSON.stringify(listsInStore));
   }, [listsInStore]);
 
   const router = useRouter();
