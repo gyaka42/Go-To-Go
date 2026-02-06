@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppStore } from "../store/appStore";
 import useInitializeApp from "../hooks/useInitializeApp";
 import { View, Text, Image } from "react-native";
+import { RRule } from "rrule";
 import logoOutline from "../assets/logo-outline.png";
 
 // Houd splash actief totdat we permissions geregeld hebben
@@ -99,44 +100,56 @@ function InnerLayout() {
           const idx = tasks.findIndex((t) => t.notificationId === notifId);
           if (idx !== -1) {
             const task = tasks[idx];
-            if (task.recurrence && task.dueDate) {
-              const { RRule } = await import("rrule");
-              const rule = new RRule({
-                dtstart: new Date(task.dueDate),
-                ...task.recurrence,
-                count: 2,
-              });
-              const allDates = rule.all();
-              if (allDates.length >= 2) {
-                const nextDate = allDates[1];
-                const listLabel =
-                  findListLabel?.(listKeyData || key) ?? "Unknown list";
-                const newId = await Notifications.scheduleNotificationAsync({
-                  content: {
-                    title: t("taskReminderTitle"),
-                    body: t("taskReminderBody", {
-                      task: task.title,
-                      list: listLabel,
-                    }),
-                    sound: true,
-                    data: { listKey: key },
-                  },
-                  trigger: {
-                    type: Notifications.SchedulableTriggerInputTypes.DATE,
-                    date: nextDate,
-                  },
-                });
+            if (!task.recurrence || !task.dueDate) break;
 
-                const updatedTask = {
-                  ...task,
-                  dueDate: nextDate,
-                  notificationId: newId,
-                };
-                const updatedTasks = tasks.map((t, i) =>
-                  i === idx ? updatedTask : t
-                );
-                setTasksMap({ ...tasksMap, [key]: updatedTasks });
-              }
+            // For simple repeating triggers (daily/weekly/monthly interval=1),
+            // Expo handles repeats automatically; don't schedule extra.
+            const freq = task.recurrence.freq;
+            const interval = task.recurrence.interval ?? 1;
+            const isSimpleDaily = freq === RRule.DAILY && interval === 1;
+            const isSimpleWeekly =
+              freq === RRule.WEEKLY &&
+              interval === 1 &&
+              Array.isArray(task.recurrence.byweekday) &&
+              task.recurrence.byweekday.length === 1;
+            const isSimpleMonthly = freq === RRule.MONTHLY && interval === 1;
+            if (isSimpleDaily || isSimpleWeekly || isSimpleMonthly) break;
+
+            const rule = new RRule({
+              dtstart: new Date(task.dueDate),
+              ...task.recurrence,
+              count: 2,
+            });
+            const allDates = rule.all();
+            if (allDates.length >= 2) {
+              const nextDate = allDates[1];
+              const listLabel =
+                findListLabel?.(listKeyData || key) ?? "Unknown list";
+              const newId = await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: t("taskReminderTitle"),
+                  body: t("taskReminderBody", {
+                    task: task.title,
+                    list: listLabel,
+                  }),
+                  sound: true,
+                  data: { listKey: key },
+                },
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.DATE,
+                  date: nextDate,
+                },
+              });
+
+              const updatedTask = {
+                ...task,
+                dueDate: nextDate,
+                notificationId: newId,
+              };
+              const updatedTasks = tasks.map((t, i) =>
+                i === idx ? updatedTask : t
+              );
+              setTasksMap({ ...tasksMap, [key]: updatedTasks });
             }
             break;
           }
