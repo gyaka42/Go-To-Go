@@ -12,7 +12,7 @@ const resources = { en, nl, tr, de, es, fr };
 
 // Start-taal: device-instelling, of fallback op NL
 let current =
-  (Localization.locale.split("-")[0] as
+  ((Localization.getLocales()[0]?.languageCode || "nl") as
     | "en"
     | "nl"
     | "tr"

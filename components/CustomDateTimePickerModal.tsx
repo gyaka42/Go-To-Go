@@ -26,6 +26,7 @@ export default function CustomDateTimePickerModal({
   const colorScheme = useColorScheme();
   const background = colorScheme === "dark" ? "#1c1c1e" : "#fff";
   const [tempDate, setTempDate] = useState(date);
+  const [androidMode, setAndroidMode] = useState<"date" | "time">("date");
 
   const lang = useAppStore((s) => s.lang);
   const t = useAppStore((s) => s.t);
@@ -43,6 +44,7 @@ export default function CustomDateTimePickerModal({
   useEffect(() => {
     if (visible) {
       setTempDate(date);
+      setAndroidMode("date");
     }
   }, [visible, date]);
 
@@ -57,11 +59,16 @@ export default function CustomDateTimePickerModal({
           style={[styles.card, { backgroundColor: background }]}
         >
           <View style={{ marginBottom: 8 }}>
-            <DateTimePicker
+            {(Platform.OS === "ios" || androidMode === "date") && (
+              <DateTimePicker
               value={tempDate}
               mode="date"
               display={Platform.OS === "ios" ? "inline" : "default"}
               onChange={(event, selectedDate) => {
+                if (Platform.OS === "android" && event.type === "dismissed") {
+                  onCancel();
+                  return;
+                }
                 if (selectedDate) {
                   const newDate = new Date(tempDate);
                   newDate.setFullYear(
@@ -70,11 +77,14 @@ export default function CustomDateTimePickerModal({
                     selectedDate.getDate()
                   );
                   setTempDate(newDate);
+                  if (Platform.OS === "android") setAndroidMode("time");
                 }
               }}
               locale={langLocale}
               themeVariant={colorScheme === "dark" ? "dark" : "light"}
-            />
+              />
+            )}
+            {Platform.OS === "ios" && (
             <View
               style={{
                 flexDirection: "row",
@@ -101,6 +111,30 @@ export default function CustomDateTimePickerModal({
                 themeVariant={colorScheme === "dark" ? "dark" : "light"}
               />
             </View>
+            )}
+            {Platform.OS === "android" && androidMode === "time" && (
+              <DateTimePicker
+                value={tempDate}
+                mode="time"
+                display="default"
+                onChange={(event, selectedTime) => {
+                  if (event.type === "dismissed") {
+                    setAndroidMode("date");
+                    return;
+                  }
+                  if (selectedTime) {
+                    const newDate = new Date(tempDate);
+                    newDate.setHours(
+                      selectedTime.getHours(),
+                      selectedTime.getMinutes(),
+                      0,
+                      0
+                    );
+                    setTempDate(newDate);
+                  }
+                }}
+              />
+            )}
           </View>
           <Pressable
             onPress={() => onConfirm(tempDate)}

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as Notifications from "expo-notifications";
 import { Task, useAppStore } from "../store/appStore";
 import { Options as RRuleOptions, RRule, Weekday } from "rrule";
+import { getNextOccurrence, normalizeRecurrence } from "../utils/recurrence";
 
 export default function useTasks(
   tasks: Task[],
@@ -30,9 +31,10 @@ export default function useTasks(
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date,
         };
-        if (recurrence) {
-          const freq = recurrence.freq;
-          const interval = recurrence.interval ?? 1;
+        const normalizedRecurrence = normalizeRecurrence(recurrence, date);
+        if (normalizedRecurrence) {
+          const freq = normalizedRecurrence.freq;
+          const interval = normalizedRecurrence.interval ?? 1;
           if (freq === RRule.DAILY && interval === 1) {
             trigger = {
               type: Notifications.SchedulableTriggerInputTypes.CALENDAR,
@@ -43,10 +45,10 @@ export default function useTasks(
           } else if (
             freq === RRule.WEEKLY &&
             interval === 1 &&
-            Array.isArray(recurrence.byweekday) &&
-            recurrence.byweekday.length === 1
+            Array.isArray(normalizedRecurrence.byweekday) &&
+            normalizedRecurrence.byweekday.length === 1
           ) {
-            const rruleDay = recurrence.byweekday[0];
+            const rruleDay = normalizedRecurrence.byweekday[0];
             let weekdayIdx: number;
             if (typeof rruleDay === "number") {
               weekdayIdx = rruleDay;
@@ -105,6 +107,7 @@ export default function useTasks(
       if (!title.trim()) return;
 
       const taskId = Crypto.randomUUID();
+      const normalizedRecurrence = normalizeRecurrence(recurrence, dueDate);
       let notificationId: string | undefined;
       if (dueDate) {
         notificationId = await scheduleReminder(
@@ -112,7 +115,7 @@ export default function useTasks(
           dueDate,
           taskId,
           listKey,
-          recurrence
+          normalizedRecurrence
         );
       }
 
@@ -123,7 +126,7 @@ export default function useTasks(
         dueDate: dueDate || null,
         notificationId,
         titleEditable: true,
-        recurrence,
+        recurrence: normalizedRecurrence,
         listKey: listKey ?? "", // fallback to empty string if undefined
         tag: tag ?? null,
         ...(dueDate || recurrence ? { highlight: true } : {}),
@@ -141,6 +144,18 @@ export default function useTasks(
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id === id) {
+            if (!t.done && t.recurrence && t.dueDate) {
+              const nextDate = getNextOccurrence(
+                new Date(t.dueDate),
+                t.recurrence,
+                new Date()
+              );
+              if (nextDate) {
+                // The native repeating notification remains scheduled. Moving
+                // the logical due date keeps the task open for its next cycle.
+                return { ...t, dueDate: nextDate, done: false };
+              }
+            }
             // if marking done, cancel its scheduled notification
             if (!t.done && t.notificationId) {
               Notifications.cancelScheduledNotificationAsync(t.notificationId);

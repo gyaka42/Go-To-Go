@@ -43,6 +43,8 @@ function InnerLayout() {
 
   useEffect(() => {
     const handledNotifIds = new Set<string>();
+    let responseSubscription: Notifications.EventSubscription | undefined;
+    let receivedSubscription: Notifications.EventSubscription | undefined;
     (async () => {
       // Vraag eerst notificatie-permissies
       const { status } = await Notifications.getPermissionsAsync();
@@ -62,7 +64,7 @@ function InnerLayout() {
       });
 
       // Handle taps on scheduled notifications with robust logging
-      Notifications.addNotificationResponseReceivedListener((response) => {
+      responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
         const notifId = response.notification.request.identifier;
         if (handledNotifIds.has(notifId)) return;
         handledNotifIds.add(notifId);
@@ -88,7 +90,7 @@ function InnerLayout() {
       });
 
       // Plan volgende herhaling zodra een notificatie wordt ontvangen
-      Notifications.addNotificationReceivedListener(async (notification) => {
+      receivedSubscription = Notifications.addNotificationReceivedListener(async (notification) => {
         const notifId = notification.request.identifier;
         const listKeyData = notification.request.content.data?.listKey as
           | string
@@ -170,6 +172,10 @@ function InnerLayout() {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await SplashScreen.hideAsync();
     })();
+    return () => {
+      responseSubscription?.remove();
+      receivedSubscription?.remove();
+    };
   }, []);
 
   return (

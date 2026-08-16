@@ -77,9 +77,10 @@ import FilterBar from "../components/FilterBar";
 import OptionsSheet from "../components/OptionsSheet";
 import ShareModal from "../app/new-list/share";
 import RecurrencePicker from "../components/RecurrencePicker";
-import { Options as RRuleOptions, Frequency } from "rrule";
+import { Options as RRuleOptions, Frequency, RRule, Weekday } from "rrule";
 import { useBaseMenu } from "../utils/menuDefaults";
 import { TAGS } from "../utils/tags";
+import { normalizeRecurrence } from "../utils/recurrence";
 
 function getRecurrenceLabel(
   recurrence?: Partial<RRuleOptions>,
@@ -273,6 +274,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 
   // Shared state
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [storeHydrated, setStoreHydrated] = useState(() =>
+    useAppStore.persist.hasHydrated()
+  );
   const [newTask, setNewTask] = useState("");
   const [newTaskTag, setNewTaskTag] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState<Date | null>(null);
@@ -359,18 +363,28 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
   const listParam = Array.isArray(key) ? key[0] : key;
   const activeListKey = mode === "edit" ? listParam || listKey : listKey;
 
-  // Load tasks
   useEffect(() => {
-    if (mode === "edit" && activeListKey) {
+    if (storeHydrated) return;
+    return useAppStore.persist.onFinishHydration(() => setStoreHydrated(true));
+  }, [storeHydrated]);
+
+  // Load tasks only after persisted data is available. Loading an empty array
+  // before hydration used to overwrite all saved tasks.
+  useEffect(() => {
+    if (storeHydrated && mode === "edit" && activeListKey) {
       const saved = tasksMap[activeListKey] || [];
-      const parsed = saved.map((t) => ({
-        ...t,
-        dueDate: t.dueDate ? new Date(t.dueDate) : null,
-        notificationId: t.notificationId || null,
-      }));
+      const parsed = saved.map((t) => {
+        const parsedDate = t.dueDate ? new Date(t.dueDate) : null;
+        return {
+          ...t,
+          dueDate: parsedDate,
+          recurrence: normalizeRecurrence(t.recurrence, parsedDate),
+          notificationId: t.notificationId || undefined,
+        };
+      });
       setTasks(parsed);
     }
-  }, [mode, activeListKey]);
+  }, [storeHydrated, mode, activeListKey]);
 
   // Scroll & highlight when arriving via notification (only once per notif)
   useEffect(() => {
@@ -419,7 +433,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 
   // Sync back
   useEffect(() => {
-    if (mode === "edit" && activeListKey) {
+    if (storeHydrated && mode === "edit" && activeListKey) {
       setTasksMap({
         ...useAppStore.getState().tasksMap,
         [activeListKey]: tasks,
@@ -432,7 +446,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           )
       );
     }
-  }, [tasks]);
+  }, [storeHydrated, tasks]);
 
   // Listen for notification taps globally in app/_layout.tsx
   const pendingNotificationRef: React.MutableRefObject<Notifications.NotificationResponse | null> =
@@ -1552,7 +1566,19 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             onPress={handleNewTaskCalendarPress}
             style={styles.iconButton}
           >
-            <Ionicons name="calendar-outline" size={24} color="#2563EB" />
+            <Ionicons
+              name={newTaskDueDate || dueDate ? "calendar" : "calendar-outline"}
+              size={24}
+              color={newTaskDueDate || dueDate ? "#10B981" : "#2563EB"}
+            />
+            {newTaskDueDate || dueDate ? (
+              <Text style={{ color: theme.secondaryText, fontSize: 10 }}>
+                {(newTaskDueDate ?? dueDate)!.toLocaleDateString(langLocale, {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </Text>
+            ) : null}
           </TouchableOpacity>
           <TextInput
             placeholder={t("newTask")}
@@ -1579,6 +1605,9 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
               height: 24,
             }}
           />
+          {recurrence ? (
+            <View style={styles.activeDot} />
+          ) : null}
           <TouchableOpacity
             onPress={() => openTagPickerForTask(null)}
             style={{ marginLeft: 8, justifyContent: "center" }}
@@ -1730,7 +1759,22 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
             extraData={highlightedTaskId}
             renderItem={renderTask}
             keyExtractor={(item) => item.id.toString()}
-            onDragEnd={({ data }) => setTasks(data)}
+            onDragEnd={({ data }) => {
+              if (filterMode === "all") {
+                setTasks(data);
+                return;
+              }
+              // Reorder only the visible subset without deleting tasks hidden
+              // by the Open/Done filter.
+              const reordered = [...data];
+              setTasks((current) =>
+                current.map((task) => {
+                  const visible =
+                    filterMode === "open" ? !task.done : task.done;
+                  return visible ? reordered.shift() ?? task : task;
+                })
+              );
+            }}
             autoscrollThreshold={80}
             autoscrollSpeed={50}
             activationDistance={0}
@@ -1797,7 +1841,15 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
                   }}
                   onSortByDate={() => {
                     setTasks((t) =>
-                      [...t].sort((a, b) => Number(a.id) - Number(b.id))
+                      [...t].sort((a, b) => {
+                        if (!a.dueDate && !b.dueDate) return 0;
+                        if (!a.dueDate) return 1;
+                        if (!b.dueDate) return -1;
+                        return (
+                          new Date(a.dueDate).getTime() -
+                          new Date(b.dueDate).getTime()
+                        );
+                      })
                     );
                     setActiveSheet(null);
                   }}
@@ -2127,7 +2179,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
           </View>
         )}
       {/* Custom iOS DateTimePickerModal */}
-      {Platform.OS === 'ios' && showDatePickerModal && (
+      {showDatePickerModal && (
           <CustomDateTimePickerModal
           visible={showDatePickerModal}
           date={
@@ -2201,6 +2253,16 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     marginRight: 8,
+    alignItems: "center",
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#10B981",
+    marginLeft: -4,
+    marginRight: -2,
+    marginTop: -18,
   },
   input: {
     flex: 1,

@@ -51,6 +51,11 @@ export default function RecurrencePicker({
   );
   useEffect(() => {
     setOptsState(initial);
+    setInterval(String(initial?.interval ?? 1));
+    setFreq(initial?.freq ?? Frequency.WEEKLY);
+    setByweekday(
+      Array.isArray(initial?.byweekday) ? (initial.byweekday as number[]) : []
+    );
   }, [initial]);
 
   const scheme = useAppStore((s) => s.scheme);
@@ -112,7 +117,13 @@ export default function RecurrencePicker({
 
   // Opslaan custom
   const saveCustom = () => {
-    const customOpts = { freq, interval: Number(interval) || 1, byweekday };
+    const customOpts: Partial<RRuleOptions> = {
+      freq,
+      interval: Math.max(1, Number(interval) || 1),
+      ...(freq === Frequency.WEEKLY && byweekday.length > 0
+        ? { byweekday }
+        : {}),
+    };
     setOptsState(customOpts);
     onChange(customOpts);
     setActiveSheet(null);

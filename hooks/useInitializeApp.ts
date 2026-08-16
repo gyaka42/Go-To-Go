@@ -3,8 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Localization from "expo-localization";
 import React, { useEffect } from "react";
-import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
 import { useAppStore, ThemeMode, Lang, ListItem } from "../store/appStore";
 
 interface InitData {
@@ -56,7 +54,7 @@ export default function useInitializeApp() {
     ) {
       setLang(lang as Lang);
     } else {
-      const locale = Localization.locale || "";
+      const locale = Localization.getLocales()[0]?.languageTag || "";
       const langCode = locale.includes("-") ? locale.split("-")[0] : locale;
       // Fallback to 'en' if langCode is not supported
       const supported: Lang[] = ["en", "nl", "tr", "de", "es", "fr"];
@@ -71,24 +69,4 @@ export default function useInitializeApp() {
     AsyncStorage.setItem("user_lists", JSON.stringify(listsInStore));
   }, [listsInStore]);
 
-  const router = useRouter();
-
-  useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        const notification = response.notification;
-        const listKey = notification.request.content.data?.listKey;
-        const notifId = notification.request.identifier;
-        if (listKey && notifId) {
-          router.push({
-            pathname: `/lists/${listKey}`,
-            params: { notif: notifId },
-          });
-        }
-      }
-    );
-    return () => {
-      subscription.remove();
-    };
-  }, [router]);
 }
