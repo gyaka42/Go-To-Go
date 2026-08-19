@@ -812,7 +812,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
               router.push("/");
             }
           }}
-          style={{ marginLeft: 16 }}
+          style={styles.headerIconButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t("back")}
         >
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
@@ -820,7 +823,10 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
       headerRight: () => (
         <TouchableOpacity
           onPress={() => setActiveSheet("options")}
-          style={{ marginRight: 16 }}
+          style={styles.headerIconButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t("options")}
         >
           <Ionicons
             name="ellipsis-vertical-outline"
@@ -830,7 +836,7 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, theme.text, router, notif]);
+  }, [navigation, theme.text, router, notif, t]);
 
   // Determine the active list, falling back to default lists if necessary
   const activeList =
@@ -2198,6 +2204,12 @@ export default function ListEditor({ mode, listKey, titleLabel }: Props) {
 }
 
 const styles = StyleSheet.create({
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   overlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1000,

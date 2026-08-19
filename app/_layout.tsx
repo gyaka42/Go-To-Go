@@ -4,7 +4,6 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Stack, useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
 import * as SplashScreen from "expo-splash-screen";
-import * as ImagePicker from "expo-image-picker";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAppStore } from "../store/appStore";
 import useInitializeApp from "../hooks/useInitializeApp";
@@ -158,18 +157,8 @@ function InnerLayout() {
         }
       });
 
-      // Vraag permissie voor fotos (image picker)
-      const { status: imageStatus } =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (imageStatus !== "granted") {
-        alert(
-          "Toestemming voor foto's is nodig om de avatar te kunnen wijzigen."
-        );
-      }
-
-      // Én nu mogen we de splash verbergen
-      // Wacht nog 1 seconde voordat we de splash verbergen
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // De fototoestemming wordt pas gevraagd wanneer de gebruiker de avatar
+      // aanpast. Zo blokkeert een niet-gerelateerde permissie de appstart niet.
       await SplashScreen.hideAsync();
     })();
     return () => {

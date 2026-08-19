@@ -42,7 +42,10 @@ export default function SearchScreen() {
       headerLeft: () => (
         <RNTouchableOpacity
           onPress={() => navigation.goBack()}
-          style={{ marginLeft: 16 }}
+          style={styles.headerIconButton}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t("back")}
         >
           <Ionicons
             name="arrow-back"
@@ -52,7 +55,7 @@ export default function SearchScreen() {
         </RNTouchableOpacity>
       ),
     });
-  }, [navigation, scheme]);
+  }, [navigation, scheme, t]);
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -195,6 +198,12 @@ export default function SearchScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   container: { flex: 1 },
   searchContainer: {
     paddingHorizontal: 16,

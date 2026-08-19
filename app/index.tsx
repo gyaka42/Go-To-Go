@@ -8,6 +8,7 @@ import React, {
 import * as Notifications from "expo-notifications";
 import {
   ActivityIndicator,
+  Alert,
   View,
   Text,
   TouchableOpacity,
@@ -104,12 +105,14 @@ export default function HomeScreen() {
     navigation.setOptions({
       headerRight: () => {
         return (
-          <>
+          <View style={styles.headerActions}>
             {/* Language dropdown menu */}
             <TouchableOpacity
               onPress={() => openWithQueue(() => setLangMenuVisible(true))}
-              style={{ marginRight: 16, paddingHorizontal: 4 }}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.headerIconButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("language")}
             >
               <Icon
                 name="public"
@@ -127,8 +130,10 @@ export default function HomeScreen() {
                       : "system") as any
                 )
               }
-              style={{ marginRight: 16 }}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={styles.headerIconButton}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t("theme")}
             >
               <MaterialIcons
                 name={
@@ -142,11 +147,11 @@ export default function HomeScreen() {
                 color={scheme === "dark" ? "#FFF" : "#000"}
               />
             </TouchableOpacity>
-          </>
+          </View>
         );
       },
     });
-  }, [navigation, mode, scheme, lang]);
+  }, [navigation, mode, scheme, lang, t]);
 
   useEffect(() => {
     AsyncStorage.getItem("list_order").then((json) => {
@@ -279,6 +284,12 @@ export default function HomeScreen() {
         onSearch={() => router.push("/search")}
         onAvatarPress={async () => {
           try {
+            const { status } =
+              await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (status !== "granted") {
+              Alert.alert(t("error"), t("NSPhotoLibraryUsageDescription"));
+              return;
+            }
             const result = await ImagePicker.launchImageLibraryAsync({
               mediaTypes: ImagePicker.MediaTypeOptions.Images,
               allowsEditing: true,
@@ -517,6 +528,17 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  headerIconButton: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   container: {
     flex: 1,
     backgroundColor: "#F3F4F6",
